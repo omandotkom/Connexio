@@ -2,10 +2,10 @@
 
 > **Project-based Terminal Manager** — Organize your terminals by project, not by window.
 
-![Version](https://img.shields.io/github/v/release/yandanp/Connexio?color=purple&label=version)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Downloads](https://img.shields.io/github/downloads/yandanp/Connexio/total?color=brightgreen)
+[![Release](https://img.shields.io/github/v/release/yandanp/Connexio?style=flat-square&color=7c3aed&label=version)](https://github.com/yandanp/Connexio/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square)](https://github.com/yandanp/Connexio/releases/latest)
+[![License](https://img.shields.io/github/license/yandanp/Connexio?style=flat-square&color=green)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/yandanp/Connexio/total?style=flat-square&color=brightgreen)](https://github.com/yandanp/Connexio/releases)
 
 ## 🎯 Problem
 
