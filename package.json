@@ -1,6 +1,6 @@
 {
   "name": "connexio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Connexio — Project-based Terminal Manager. Organize your terminals by project.",
   "main": "dist/main/main/index.js",
   "author": "Connexio",
