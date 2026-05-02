@@ -5,18 +5,23 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest]
-        # Tambahkan jika mau build multi-platform:
-        # os: [windows-latest, macos-latest, ubuntu-latest]
+  build:
+    runs-on: windows-latest
+    # Tambahkan matrix jika mau multi-platform:
+    # runs-on: ${{ matrix.os }}
+    # strategy:
+    #   matrix:
+    #     os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for changelog
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,18 +32,107 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build & Release
+      - name: Build app
+        run: npm run build
+
+      - name: Package & upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          npm run build
-          npx electron-builder --win --publish always
+        run: npx electron-builder --win --publish always
 
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: connexio-${{ matrix.os }}
+          name: connexio-windows
           path: |
             release/*.exe
             release/*.blockmap
           retention-days: 30
+
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-creatordate | head -2 | tail -1)
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+
+          if [ "$PREV_TAG" = "$CURRENT_TAG" ]; then
+            # First release — use all commits
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Generating changelog from $PREV_TAG to $CURRENT_TAG"
+
+          # Categorize commits
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+
+          while IFS= read -r line; do
+            if [[ "$line" == feat:* ]] || [[ "$line" == feat\(*\):* ]]; then
+              FEATURES="$FEATURES\n- ${line#feat: }"
+            elif [[ "$line" == fix:* ]] || [[ "$line" == fix\(*\):* ]]; then
+              FIXES="$FIXES\n- ${line#fix: }"
+            elif [[ "$line" == ci:* ]] || [[ "$line" == chore:* ]] || [[ "$line" == release:* ]]; then
+              : # skip ci/chore/release commits
+            else
+              OTHER="$OTHER\n- $line"
+            fi
+          done <<< "$(git log $PREV_TAG..$CURRENT_TAG --pretty=format:'%s' --no-merges)"
+
+          # Build release notes
+          NOTES=""
+
+          if [ -n "$FEATURES" ]; then
+            NOTES="$NOTES## ✨ New Features\n$FEATURES\n\n"
+          fi
+
+          if [ -n "$FIXES" ]; then
+            NOTES="$NOTES## 🐛 Bug Fixes\n$FIXES\n\n"
+          fi
+
+          if [ -n "$OTHER" ]; then
+            NOTES="$NOTES## 📦 Other Changes\n$OTHER\n\n"
+          fi
+
+          NOTES="$NOTES---\n\n"
+          NOTES="$NOTES**Full Changelog:** [\`$PREV_TAG...$CURRENT_TAG\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$CURRENT_TAG)\n\n"
+          NOTES="$NOTES### 📥 Download\n"
+          NOTES="$NOTES- **Windows Installer:** \`Connexio Setup ${{ steps.version.outputs.VERSION }}.exe\`\n"
+          NOTES="$NOTES- **Portable:** Available in the \`win-unpacked\` artifact"
+
+          # Write to file (handle multiline)
+          echo -e "$NOTES" > release_notes.md
+          cat release_notes.md
+
+      - name: Update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+
+          # Wait for electron-builder to create the release
+          echo "Waiting for release to be created..."
+          sleep 30
+
+          # Update release with changelog (make it non-draft + add notes)
+          gh release edit "$TAG" \
+            --repo ${{ github.repository }} \
+            --title "Connexio $TAG" \
+            --notes-file release_notes.md \
+            --latest \
+            2>/dev/null || echo "Release edit skipped (may not exist yet as draft)"
