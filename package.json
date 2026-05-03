@@ -1,6 +1,6 @@
 {
   "name": "connexio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Connexio — Project-based Terminal Manager. Organize your terminals by project.",
   "main": "dist/main/main/index.js",
   "author": "Connexio",
@@ -74,8 +74,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico",
-      "publisherName": "Connexio"
+      "icon": "assets/icon.ico"
     },
     "mac": {
       "target": "dmg",

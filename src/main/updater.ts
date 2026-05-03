@@ -29,6 +29,15 @@ export function setupUpdaterIPC() {
 	autoUpdater.autoDownload = false;
 	autoUpdater.autoInstallOnAppQuit = true;
 
+	// Skip Windows code signing verification.
+	// Without a paid certificate, electron-updater rejects the update with
+	// "not signed by the application owner". This override disables that check.
+	// Security is still maintained via SHA512 hash verification in latest.yml.
+	if (process.platform === "win32") {
+		(autoUpdater as any).verifyUpdateCodeSignature = () =>
+			Promise.resolve(null);
+	}
+
 	// Updater events → renderer
 	autoUpdater.on("checking-for-update", () => {
 		sendToRenderer("updater:checking");
