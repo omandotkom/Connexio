@@ -1,10 +1,19 @@
-import { Monitor, Palette, Terminal, X } from "lucide-react";
+import {
+	CheckCircle2,
+	Download,
+	Loader2,
+	Monitor,
+	Palette,
+	Rocket,
+	Terminal,
+	X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AppSettings } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
 
-type SettingsTab = "general" | "terminal" | "appearance";
+type SettingsTab = "general" | "terminal" | "appearance" | "about";
 
 const DEFAULT_SETTINGS: AppSettings = {
 	defaultShell: "",
@@ -68,12 +77,16 @@ export default function SettingsModal() {
 	// Use local settings or fallback to defaults while loading
 	const effectiveSettings = localSettings || settings || DEFAULT_SETTINGS;
 
-	const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode }> =
-		[
-			{ id: "general", label: "General", icon: <Monitor size={14} /> },
-			{ id: "terminal", label: "Terminal", icon: <Terminal size={14} /> },
-			{ id: "appearance", label: "Appearance", icon: <Palette size={14} /> },
-		];
+	const tabs: Array<{
+		id: SettingsTab;
+		label: string;
+		icon: React.ReactNode;
+	}> = [
+		{ id: "general", label: "General", icon: <Monitor size={14} /> },
+		{ id: "terminal", label: "Terminal", icon: <Terminal size={14} /> },
+		{ id: "appearance", label: "Appearance", icon: <Palette size={14} /> },
+		{ id: "about", label: "About", icon: <Rocket size={14} /> },
+	];
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -132,6 +145,7 @@ export default function SettingsModal() {
 								onThemeChange={setTheme}
 							/>
 						)}
+						{activeTab === "about" && <AboutSettings />}
 					</div>
 				</div>
 
@@ -387,6 +401,228 @@ function AppearanceSettings({
 						</button>
 					))}
 				</div>
+			</div>
+		</div>
+	);
+}
+
+// === About Settings (with Check for Update) ===
+type UpdateCheckState =
+	| "idle"
+	| "checking"
+	| "available"
+	| "up-to-date"
+	| "downloading"
+	| "downloaded"
+	| "error";
+
+function AboutSettings() {
+	const [version, setVersion] = useState("");
+	const [updateState, setUpdateState] = useState<UpdateCheckState>("idle");
+	const [updateVersion, setUpdateVersion] = useState("");
+	const [downloadPercent, setDownloadPercent] = useState(0);
+	const [errorMsg, setErrorMsg] = useState("");
+
+	useEffect(() => {
+		window.connexio.app
+			.getVersion()
+			.then(setVersion)
+			.catch(() => {});
+
+		const unsubs: Array<() => void> = [];
+
+		unsubs.push(
+			window.connexio.updater.onChecking(() => {
+				setUpdateState("checking");
+			}),
+		);
+		unsubs.push(
+			window.connexio.updater.onAvailable((info) => {
+				setUpdateState("available");
+				setUpdateVersion(info.version);
+			}),
+		);
+		unsubs.push(
+			window.connexio.updater.onNotAvailable(() => {
+				setUpdateState("up-to-date");
+			}),
+		);
+		unsubs.push(
+			window.connexio.updater.onProgress((progress) => {
+				setUpdateState("downloading");
+				setDownloadPercent(progress.percent);
+			}),
+		);
+		unsubs.push(
+			window.connexio.updater.onDownloaded(() => {
+				setUpdateState("downloaded");
+			}),
+		);
+		unsubs.push(
+			window.connexio.updater.onError((message) => {
+				setUpdateState("error");
+				setErrorMsg(message);
+			}),
+		);
+
+		return () => {
+			for (const unsub of unsubs) unsub();
+		};
+	}, []);
+
+	const handleCheckUpdate = () => {
+		setUpdateState("checking");
+		setErrorMsg("");
+		window.connexio.updater.check();
+	};
+
+	const handleDownload = () => {
+		window.connexio.updater.download();
+	};
+
+	const handleInstall = () => {
+		window.connexio.updater.install();
+	};
+
+	return (
+		<div className="space-y-5">
+			<h3 className="text-xs font-semibold text-connexio-text-secondary uppercase tracking-wider">
+				About
+			</h3>
+
+			{/* App Info */}
+			<div className="flex items-center gap-3 p-3 bg-connexio-bg-tertiary rounded-lg border border-connexio-border">
+				<img
+					src={new URL("../assets/icon.png", import.meta.url).href}
+					alt="Connexio"
+					className="w-10 h-10 rounded-lg"
+				/>
+				<div>
+					<p className="text-sm font-semibold text-connexio-text">Connexio</p>
+					<p className="text-[11px] text-connexio-text-secondary">
+						Project-based Terminal Manager
+					</p>
+					{version && (
+						<p className="text-[10px] text-connexio-text-muted mt-0.5">
+							Version {version}
+						</p>
+					)}
+				</div>
+			</div>
+
+			{/* Update Section */}
+			<div className="space-y-3">
+				<label className="block text-xs font-medium text-connexio-text-secondary">
+					Updates
+				</label>
+
+				{/* Check for Update Button */}
+				{(updateState === "idle" ||
+					updateState === "up-to-date" ||
+					updateState === "error") && (
+					<div className="space-y-2">
+						<button
+							onClick={handleCheckUpdate}
+							className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-connexio-bg-tertiary border border-connexio-border rounded-lg hover:border-connexio-accent hover:text-connexio-accent transition-colors text-connexio-text-secondary"
+							type="button"
+						>
+							<Download size={13} />
+							Check for Updates
+						</button>
+
+						{updateState === "up-to-date" && (
+							<div className="flex items-center gap-2 text-[11px] text-green-400">
+								<CheckCircle2 size={13} />
+								<span>You're on the latest version.</span>
+							</div>
+						)}
+
+						{updateState === "error" && (
+							<div className="flex items-center gap-2 text-[11px] text-red-400">
+								<X size={13} />
+								<span className="truncate">
+									{errorMsg || "Failed to check for updates."}
+								</span>
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* Checking */}
+				{updateState === "checking" && (
+					<div className="flex items-center gap-2 text-[11px] text-connexio-text-secondary">
+						<Loader2 size={13} className="animate-spin" />
+						<span>Checking for updates...</span>
+					</div>
+				)}
+
+				{/* Update Available */}
+				{updateState === "available" && (
+					<div className="p-3 bg-connexio-bg-tertiary rounded-lg border border-connexio-accent/30 space-y-2">
+						<div className="flex items-center gap-2">
+							<Rocket size={13} className="text-connexio-accent" />
+							<span className="text-xs font-medium text-connexio-text">
+								Version {updateVersion} is available!
+							</span>
+						</div>
+						<button
+							onClick={handleDownload}
+							className="flex items-center gap-2 px-4 py-1.5 text-xs font-medium text-white bg-connexio-accent rounded hover:bg-connexio-accent-hover transition-colors"
+							type="button"
+						>
+							<Download size={12} />
+							Download Update
+						</button>
+					</div>
+				)}
+
+				{/* Downloading */}
+				{updateState === "downloading" && (
+					<div className="p-3 bg-connexio-bg-tertiary rounded-lg border border-connexio-border space-y-2">
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-2 text-[11px] text-connexio-text-secondary">
+								<Loader2 size={13} className="animate-spin" />
+								<span>Downloading update...</span>
+							</div>
+							<span className="text-[11px] text-connexio-text-muted font-mono">
+								{Math.round(downloadPercent)}%
+							</span>
+						</div>
+						<div className="h-1.5 bg-connexio-bg rounded-full overflow-hidden">
+							<div
+								className="h-full bg-connexio-accent rounded-full transition-all duration-300"
+								style={{ width: `${downloadPercent}%` }}
+							/>
+						</div>
+					</div>
+				)}
+
+				{/* Downloaded */}
+				{updateState === "downloaded" && (
+					<div className="p-3 bg-connexio-bg-tertiary rounded-lg border border-green-500/30 space-y-2">
+						<div className="flex items-center gap-2">
+							<CheckCircle2 size={13} className="text-green-400" />
+							<span className="text-xs font-medium text-connexio-text">
+								Update downloaded. Restart to apply.
+							</span>
+						</div>
+						<button
+							onClick={handleInstall}
+							className="flex items-center gap-2 px-4 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors"
+							type="button"
+						>
+							<Rocket size={12} />
+							Restart & Update
+						</button>
+					</div>
+				)}
+			</div>
+
+			{/* Links */}
+			<div className="pt-2 border-t border-connexio-border space-y-1.5">
+				<p className="text-[10px] text-connexio-text-muted">
+					Made with ♥ by Connexio Team
+				</p>
 			</div>
 		</div>
 	);

@@ -9,6 +9,7 @@ import "@xterm/xterm/css/xterm.css";
 
 interface Props {
 	terminalId: string;
+	isVisible?: boolean;
 }
 
 function buildXtermTheme(terminal: TerminalThemeColors) {
@@ -37,16 +38,38 @@ function buildXtermTheme(terminal: TerminalThemeColors) {
 	};
 }
 
-export default function Terminal({ terminalId }: Props) {
+export default function Terminal({ terminalId, isVisible }: Props) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
+	// Global disposed flag — checked by ALL operations on this terminal
+	const disposedRef = useRef(false);
 	const { currentTheme } = useThemeStore();
 	const { settings } = useSettingsStore();
+
+	// Safe wrapper: only call xterm/fitAddon if not disposed
+	const safeFit = () => {
+		if (disposedRef.current) return;
+		try {
+			const el = containerRef.current;
+			if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return;
+			const fitAddon = fitAddonRef.current;
+			if (!fitAddon) return;
+			fitAddon.fit();
+			const dims = fitAddon.proposeDimensions();
+			if (dims && dims.cols > 0 && dims.rows > 0) {
+				window.connexio.terminal.resize(terminalId, dims.cols, dims.rows);
+			}
+		} catch (_e) {
+			// ignore — terminal may be mid-dispose
+		}
+	};
 
 	// Effect: create and manage terminal instance
 	useEffect(() => {
 		if (!containerRef.current) return;
+
+		disposedRef.current = false;
 
 		const xterm = new XTerm({
 			fontSize: settings?.fontSize || 13,
@@ -55,9 +78,14 @@ export default function Terminal({ terminalId }: Props) {
 				"'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
 			cursorBlink: settings?.cursorBlink ?? true,
 			cursorStyle: settings?.cursorStyle || "bar",
-			scrollback: settings?.scrollback || 5000,
+			scrollback: settings?.scrollback || 2000,
 			allowProposedApi: true,
 			theme: currentTheme ? buildXtermTheme(currentTheme.terminal) : undefined,
+			letterSpacing: 0,
+			convertEol: false,
+			altClickMovesCursor: true,
+			fastScrollModifier: "alt",
+			fastScrollSensitivity: 5,
 		});
 
 		const fitAddon = new FitAddon();
@@ -65,13 +93,48 @@ export default function Terminal({ terminalId }: Props) {
 		xterm.loadAddon(new WebLinksAddon());
 
 		xterm.open(containerRef.current);
-		fitAddon.fit();
 
 		xtermRef.current = xterm;
 		fitAddonRef.current = fitAddon;
 
-		// Copy on select
+		// --- Write batcher ---
+		let writeBuffer = "";
+		let writeRafId: number | null = null;
+		let writeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+		const flushWrites = () => {
+			writeRafId = null;
+			if (writeTimeoutId !== null) {
+				clearTimeout(writeTimeoutId);
+				writeTimeoutId = null;
+			}
+			if (disposedRef.current || writeBuffer.length === 0) {
+				writeBuffer = "";
+				return;
+			}
+			const data = writeBuffer;
+			writeBuffer = "";
+			try {
+				xterm.write(data);
+			} catch (_e) {
+				// terminal disposed mid-flush
+			}
+		};
+
+		const batchWrite = (data: string) => {
+			if (disposedRef.current) return;
+			writeBuffer += data;
+			if (writeRafId === null) {
+				writeRafId = requestAnimationFrame(flushWrites);
+			}
+			if (writeTimeoutId === null) {
+				writeTimeoutId = setTimeout(flushWrites, 8);
+			}
+		};
+
+		// --- Event listeners ---
 		const selectionDisposable = xterm.onSelectionChange(() => {
+			if (disposedRef.current) return;
 			const currentSettings = useSettingsStore.getState().settings;
 			if (currentSettings?.copyOnSelect) {
 				const selection = xterm.getSelection();
@@ -81,83 +144,111 @@ export default function Terminal({ terminalId }: Props) {
 			}
 		});
 
-		// Send input to backend
 		const dataDisposable = xterm.onData((data) => {
+			if (disposedRef.current) return;
 			window.connexio.terminal.write(terminalId, data);
 		});
 
-		// Receive output from backend
 		const unsubscribe = window.connexio.terminal.onData(
 			(id: string, data: string) => {
 				if (id === terminalId) {
-					xterm.write(data);
+					batchWrite(data);
 				}
 			},
 		);
 
-		// Safe fit: only resize when container is visible and has dimensions
-		const safeFit = () => {
-			try {
-				const el = containerRef.current;
-				if (!el || el.offsetWidth === 0 || el.offsetHeight === 0) return;
-				fitAddon.fit();
-				const dims = fitAddon.proposeDimensions();
-				if (dims && dims.cols > 0 && dims.rows > 0) {
-					window.connexio.terminal.resize(terminalId, dims.cols, dims.rows);
-				}
-			} catch (_e) {
-				// ignore resize errors during disposal or hidden state
-			}
+		// --- Resize ---
+		let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+		const debouncedFit = () => {
+			if (disposedRef.current) return;
+			if (resizeTimer !== null) clearTimeout(resizeTimer);
+			resizeTimer = setTimeout(() => {
+				resizeTimer = null;
+				safeFit();
+			}, 100);
 		};
 
-		// Resize handling
-		const resizeObserver = new ResizeObserver(() => safeFit());
+		const resizeObserver = new ResizeObserver(() => debouncedFit());
 		resizeObserver.observe(containerRef.current);
 
-		// Initial resize after DOM settles
-		const resizeTimer = setTimeout(safeFit, 100);
+		const initTimer1 = setTimeout(safeFit, 50);
+		const initTimer2 = setTimeout(safeFit, 200);
+		const initTimer3 = setTimeout(safeFit, 500);
 
+		// --- Cleanup ---
 		return () => {
-			clearTimeout(resizeTimer);
+			// 1. Set disposed flag FIRST — stops all async operations immediately
+			disposedRef.current = true;
+
+			// 2. Cancel all pending timers
+			clearTimeout(initTimer1);
+			clearTimeout(initTimer2);
+			clearTimeout(initTimer3);
+			if (resizeTimer !== null) clearTimeout(resizeTimer);
+			if (writeRafId !== null) cancelAnimationFrame(writeRafId);
+			if (writeTimeoutId !== null) clearTimeout(writeTimeoutId);
+			writeBuffer = "";
+
+			// 3. Remove IPC listener (stops data flow from backend)
+			unsubscribe();
+
+			// 4. Remove xterm event listeners
 			selectionDisposable.dispose();
 			dataDisposable.dispose();
-			unsubscribe();
+
+			// 5. Disconnect resize observer
 			resizeObserver.disconnect();
-			xterm.dispose();
+
+			// 6. Finally dispose xterm (after everything else is cleaned up)
+			try {
+				xterm.dispose();
+			} catch (_e) {
+				// ignore
+			}
 			xtermRef.current = null;
 			fitAddonRef.current = null;
 		};
 	}, [terminalId]);
 
-	// Effect: update theme dynamically without recreating terminal
+	// Effect: update theme
 	useEffect(() => {
-		if (xtermRef.current && currentTheme) {
+		if (disposedRef.current || !xtermRef.current || !currentTheme) return;
+		try {
 			xtermRef.current.options.theme = buildXtermTheme(currentTheme.terminal);
+		} catch (_e) {
+			// ignore
 		}
 	}, [currentTheme]);
 
-	// Effect: update settings dynamically
+	// Effect: re-fit when terminal becomes visible
 	useEffect(() => {
-		if (xtermRef.current && settings) {
+		if (!isVisible || disposedRef.current) return;
+		if (!xtermRef.current || !fitAddonRef.current) return;
+
+		const timer = setTimeout(() => {
+			safeFit();
+			try {
+				xtermRef.current?.focus();
+			} catch (_e) {
+				// ignore
+			}
+		}, 50);
+
+		return () => clearTimeout(timer);
+	}, [isVisible, terminalId]);
+
+	// Effect: update settings
+	useEffect(() => {
+		if (disposedRef.current || !xtermRef.current || !settings) return;
+		try {
 			xtermRef.current.options.fontSize = settings.fontSize;
 			xtermRef.current.options.fontFamily = settings.fontFamily;
 			xtermRef.current.options.cursorBlink = settings.cursorBlink;
 			xtermRef.current.options.cursorStyle = settings.cursorStyle;
 			xtermRef.current.options.scrollback = settings.scrollback;
-			// Re-fit after font change — only if visible
-			const el = containerRef.current;
-			if (
-				fitAddonRef.current &&
-				el &&
-				el.offsetWidth > 0 &&
-				el.offsetHeight > 0
-			) {
-				try {
-					fitAddonRef.current.fit();
-				} catch (_e) {
-					// ignore
-				}
-			}
+			safeFit();
+		} catch (_e) {
+			// ignore
 		}
 	}, [settings]);
 

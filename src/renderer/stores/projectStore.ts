@@ -94,26 +94,37 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 	},
 
 	deleteProject: async (id: string) => {
-		const { workspaceTabs, activeTabIds } = get();
+		const { workspaceTabs, activeTabIds, activeProjectId, projects } = get();
 		const tabs = workspaceTabs[id] || [];
+
+		// 1. First update state to remove the project from UI
+		//    This unmounts Terminal components BEFORE we kill PTY processes
+		const { [id]: _removedTabs, ...restTabs } = workspaceTabs;
+		const { [id]: _removedActive, ...restActiveIds } = activeTabIds;
+
+		// If deleting active project, switch to another one
+		let newActiveId: string | null = activeProjectId;
+		if (activeProjectId === id) {
+			const remaining = projects.filter((p) => p.id !== id);
+			newActiveId = remaining.length > 0 ? remaining[0].id : null;
+		}
+
+		set({
+			workspaceTabs: restTabs,
+			activeTabIds: restActiveIds,
+			activeProjectId: newActiveId,
+		});
+
+		// 2. Now close PTY processes (after UI has unmounted terminals)
 		for (const tab of tabs) {
 			if (tab.terminalId) {
 				await window.connexio.terminal.close(tab.terminalId);
 			}
 		}
 
+		// 3. Delete from storage
 		await window.connexio.project.delete(id);
-		const { activeProjectId } = get();
-
-		const { [id]: _removedTabs, ...restTabs } = workspaceTabs;
-		const { [id]: _removedActive, ...restActiveIds } = activeTabIds;
-
-		set({
-			projects: await window.connexio.project.list(),
-			workspaceTabs: restTabs,
-			activeTabIds: restActiveIds,
-			activeProjectId: activeProjectId === id ? null : activeProjectId,
-		});
+		set({ projects: await window.connexio.project.list() });
 
 		get().persistWorkspace();
 	},

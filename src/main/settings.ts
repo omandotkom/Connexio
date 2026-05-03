@@ -186,7 +186,16 @@ export function setupSettingsIPC() {
 	ipcMain.handle("settings:get-default-shell", () => {
 		const settings = getSettings();
 		if (settings.defaultShell) return settings.defaultShell;
-		if (os.platform() === "win32") return "powershell.exe";
+		if (os.platform() === "win32") {
+			// Prefer PowerShell 7 over Windows PowerShell 5.1
+			const pwsh7 = "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
+			try {
+				if (fs.existsSync(pwsh7)) return pwsh7;
+			} catch {
+				// ignore
+			}
+			return "powershell.exe";
+		}
 		return process.env.SHELL || "/bin/bash";
 	});
 }

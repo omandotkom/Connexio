@@ -260,7 +260,13 @@ export default function Sidebar() {
 											<button
 												onClick={(e) => {
 													e.stopPropagation();
-													deleteProject(project.id);
+													if (
+														confirm(
+															`Remove "${project.name}" from Connexio?\n\nThis won't delete any files on disk.`,
+														)
+													) {
+														deleteProject(project.id);
+													}
 												}}
 												className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/20 transition-all flex-shrink-0"
 												type="button"

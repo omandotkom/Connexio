@@ -12,10 +12,16 @@ interface Props {
 	terminalId: string;
 }
 
+// Shared prompt detection — compiled once, not per-chunk
+const PROMPT_REGEX = /(?:\$|>|#|❯|➜)\s*$|PS [A-Z]:\\[^>]*>\s*$/m;
+
 /**
  * Tracks command execution time by detecting prompt patterns.
  * Shows elapsed time while running, and duration of last command when done.
  * Sends desktop notification for long-running commands (>10s).
+ *
+ * Performance: prompt detection is throttled to avoid running regex
+ * on every data chunk during heavy AI agent output streaming.
  */
 export default function CommandTimer({ terminalId }: Props) {
 	const [state, setState] = useState<CommandTimerState>({
@@ -30,90 +36,80 @@ export default function CommandTimer({ terminalId }: Props) {
 	stateRef.current = state;
 
 	// Listen to terminal data to detect command start/end
+	// Throttled: only check the LAST chunk received within a 500ms window
 	useEffect(() => {
+		let lastData = "";
+		let checkTimer: ReturnType<typeof setTimeout> | null = null;
+		let sawPrompt = false;
+
+		const checkPrompt = () => {
+			checkTimer = null;
+
+			const hasPrompt = PROMPT_REGEX.test(lastData);
+
+			if (hasPrompt && stateRef.current.isRunning) {
+				// Command finished — prompt appeared
+				const duration = stateRef.current.startTime
+					? Date.now() - stateRef.current.startTime
+					: 0;
+
+				setState({
+					isRunning: false,
+					startTime: null,
+					lastDuration: duration,
+					lastExitSuccess: true,
+				});
+
+				// Desktop notification for long-running commands (>10s)
+				if (duration > 10000) {
+					new Notification("Command Completed", {
+						body: `Finished in ${formatDuration(duration)}`,
+						silent: false,
+					});
+				}
+				sawPrompt = true;
+			} else if (hasPrompt) {
+				// Prompt visible, not running — ready for next command
+				sawPrompt = true;
+			} else if (sawPrompt && !stateRef.current.isRunning) {
+				// Output appeared after prompt was shown — command started
+				sawPrompt = false;
+				setState({
+					isRunning: true,
+					startTime: Date.now(),
+					lastDuration: null,
+					lastExitSuccess: null,
+				});
+			}
+
+			lastData = "";
+		};
+
 		const unsubscribe = window.connexio.terminal.onData(
 			(id: string, data: string) => {
 				if (id !== terminalId) return;
 
-				// Detect prompt patterns (command finished)
-				// Common patterns: PS C:\>, $, >, #, user@host:~$
-				const promptPatterns = [
-					/\$\s*$/m, // Unix prompt ending with $
-					/>\s*$/m, // Windows PS/CMD prompt ending with >
-					/#\s*$/m, // Root prompt ending with #
-					/❯\s*$/m, // Starship/custom prompt
-					/➜\s*$/m, // Oh-my-zsh prompt
-					/PS [A-Z]:\\[^>]*>\s*$/m, // PowerShell PS C:\path>
-				];
-
-				const hasPrompt = promptPatterns.some((p) => p.test(data));
-
-				if (hasPrompt && stateRef.current.isRunning) {
-					// Command finished
-					const duration = stateRef.current.startTime
-						? Date.now() - stateRef.current.startTime
-						: 0;
-
-					setState({
-						isRunning: false,
-						startTime: null,
-						lastDuration: duration,
-						lastExitSuccess: true, // We can't easily detect exit code from output
-					});
-
-					// Desktop notification for long-running commands (>10s)
-					if (duration > 10000) {
-						const seconds = Math.round(duration / 1000);
-						new Notification("Command Completed", {
-							body: `Finished in ${formatDuration(duration)}`,
-							silent: false,
-						});
-					}
+				// Buffer the last chunk — only run regex after 500ms idle
+				lastData = data;
+				if (checkTimer !== null) {
+					clearTimeout(checkTimer);
 				}
+				checkTimer = setTimeout(checkPrompt, 500);
 			},
 		);
 
-		return () => unsubscribe();
-	}, [terminalId]);
-
-	// Detect command start: when user writes to terminal
-	useEffect(() => {
-		// We detect "Enter" key being sent to terminal as command start
-		// This is a heuristic — we intercept writes to detect \r or \n
-		const originalWrite = window.connexio.terminal.write;
-
-		// Patch: detect when Enter is pressed
-		const patchedWrite = async (id: string, data: string) => {
-			if (
-				id === terminalId &&
-				(data === "\r" || data === "\n" || data === "\r\n")
-			) {
-				// User pressed Enter — command started
-				if (!stateRef.current.isRunning) {
-					setState({
-						isRunning: true,
-						startTime: Date.now(),
-						lastDuration: null,
-						lastExitSuccess: null,
-					});
-				}
-			}
-			return originalWrite(id, data);
+		return () => {
+			unsubscribe();
+			if (checkTimer !== null) clearTimeout(checkTimer);
 		};
-
-		// We can't easily patch the preload API, so instead we'll use a simpler approach:
-		// Just track based on output patterns
-		// The "isRunning" state is set when we DON'T see a prompt for a while after data
-
-		return () => {};
 	}, [terminalId]);
 
-	// Elapsed timer
+	// Elapsed timer — update every second instead of every 100ms
 	useEffect(() => {
 		if (state.isRunning && state.startTime) {
 			intervalRef.current = setInterval(() => {
 				setElapsed(Date.now() - (stateRef.current.startTime || Date.now()));
-			}, 100);
+			}, 1000);
 		} else {
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);

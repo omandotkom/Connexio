@@ -28,13 +28,18 @@ export default function GitStatusBar({ projectPath }: Props) {
 	useEffect(() => {
 		fetchStatus();
 
-		// Poll every 5 seconds
-		intervalRef.current = setInterval(fetchStatus, 5000);
+		// Poll every 30 seconds (reduced from 5s to save CPU/RAM)
+		intervalRef.current = setInterval(fetchStatus, 30000);
+
+		// Also refresh when window regains focus
+		const onFocus = () => fetchStatus();
+		window.addEventListener("focus", onFocus);
 
 		return () => {
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
 			}
+			window.removeEventListener("focus", onFocus);
 		};
 	}, [projectPath]);
 
