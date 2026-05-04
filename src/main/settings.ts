@@ -7,22 +7,43 @@ import type { AppSettings, ShellInfo } from "../shared/types";
 
 const store = new Store({ name: "settings" });
 
+const MIN_SCROLLBACK = 500;
+const MAX_SCROLLBACK = 2000;
+
 const DEFAULT_SETTINGS: AppSettings = {
 	defaultShell: "",
 	fontSize: 13,
 	fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
 	cursorStyle: "bar",
-	cursorBlink: true,
-	scrollback: 5000,
+	cursorBlink: false,
+	scrollback: 1000,
 	copyOnSelect: false,
 };
 
+function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
+	const scrollback = Number(settings.scrollback ?? DEFAULT_SETTINGS.scrollback);
+	return {
+		...DEFAULT_SETTINGS,
+		...settings,
+		cursorBlink: settings.cursorBlink ?? DEFAULT_SETTINGS.cursorBlink,
+		scrollback: Math.min(
+			MAX_SCROLLBACK,
+			Math.max(
+				MIN_SCROLLBACK,
+				Number.isFinite(scrollback) ? scrollback : DEFAULT_SETTINGS.scrollback,
+			),
+		),
+	};
+}
+
 function getSettings(): AppSettings {
-	return store.get("settings", DEFAULT_SETTINGS) as AppSettings;
+	return normalizeSettings(
+		store.get("settings", DEFAULT_SETTINGS) as Partial<AppSettings>,
+	);
 }
 
 function saveSettings(settings: AppSettings) {
-	store.set("settings", settings);
+	store.set("settings", normalizeSettings(settings));
 }
 
 function shellExists(shellPath: string): boolean {

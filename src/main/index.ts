@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "path";
 import { setupGitIPC } from "./git";
 import { setupProjectIPC } from "./project";
@@ -31,6 +31,12 @@ app.commandLine.appendSwitch(
 // The `before-quit` handler at the bottom calls killAllTerminals().
 
 // Enforce single instance — prevent GPU cache conflicts and duplicate terminals
+// In dev, use a separate userData folder so it doesn't conflict with the
+// installed/production Connexio app, while still preventing duplicate dev apps.
+const isDev = !app.isPackaged;
+if (isDev) {
+	app.setPath("userData", path.join(app.getPath("appData"), "connexio-dev"));
+}
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
 	app.quit();
@@ -75,20 +81,14 @@ function createWindow() {
 		// Production: always load from built files
 		mainWindow.loadFile(rendererPath);
 	} else {
-		// Development: try Vite dev server, fallback to built files
-		const devServerUrl = "http://localhost:5173";
-
-		mainWindow
-			.loadURL(devServerUrl)
-			.then(() => {
-				// Dev server available — open DevTools
-				mainWindow?.webContents.openDevTools({ mode: "detach" });
-			})
-			.catch(() => {
-				// Dev server not running — fallback to built renderer
-				console.log("Vite dev server not available, loading built renderer...");
-				mainWindow?.loadFile(rendererPath);
-			});
+		// Development: load Vite dev server.
+		// `npm run dev` starts Vite first, so fail fast if it is unavailable
+		// instead of silently loading stale built files from dist/renderer.
+		mainWindow.loadURL("http://localhost:5173").then(() => {
+			if (mainWindow && !mainWindow.isDestroyed()) {
+				mainWindow.webContents.openDevTools({ mode: "detach" });
+			}
+		});
 	}
 
 	mainWindow.once("ready-to-show", () => {
@@ -131,6 +131,10 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(() => {
+	// Remove default Electron menu to prevent it from capturing
+	// keyboard shortcuts (Ctrl+V, Ctrl+C, etc.) before they reach xterm.js
+	Menu.setApplicationMenu(null);
+
 	// Register all IPC handlers once before creating window
 	setupAppIPC();
 	setupTerminalIPC();
@@ -164,7 +168,7 @@ app.on("before-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-	if (process.platform !== "darwin") {
+	if (process.platform !== "darwin" || isDev) {
 		app.quit();
 	}
 });

@@ -15,15 +15,22 @@ import { useThemeStore } from "../stores/themeStore";
 
 type SettingsTab = "general" | "terminal" | "appearance" | "about";
 
+const MIN_SCROLLBACK = 500;
+const MAX_SCROLLBACK = 2000;
+
 const DEFAULT_SETTINGS: AppSettings = {
 	defaultShell: "",
 	fontSize: 13,
 	fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
 	cursorStyle: "bar",
-	cursorBlink: true,
-	scrollback: 5000,
+	cursorBlink: false,
+	scrollback: 1000,
 	copyOnSelect: false,
 };
+
+function clampScrollback(value: number): number {
+	return Math.min(MAX_SCROLLBACK, Math.max(MIN_SCROLLBACK, value));
+}
 
 export default function SettingsModal() {
 	const {
@@ -323,15 +330,17 @@ function TerminalSettings({
 				<div className="flex items-center gap-3">
 					<input
 						type="range"
-						min={1000}
-						max={50000}
-						step={1000}
-						value={settings.scrollback}
-						onChange={(e) => onChange("scrollback", Number(e.target.value))}
+						min={MIN_SCROLLBACK}
+						max={MAX_SCROLLBACK}
+						step={100}
+						value={clampScrollback(settings.scrollback)}
+						onChange={(e) =>
+							onChange("scrollback", clampScrollback(Number(e.target.value)))
+						}
 						className="flex-1 accent-[var(--accent-color)]"
 					/>
 					<span className="text-xs text-connexio-text w-14 text-right">
-						{settings.scrollback.toLocaleString()}
+						{clampScrollback(settings.scrollback).toLocaleString()}
 					</span>
 				</div>
 			</div>

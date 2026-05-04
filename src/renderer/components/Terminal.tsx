@@ -38,6 +38,15 @@ function buildXtermTheme(terminal: TerminalThemeColors) {
 	};
 }
 
+const MIN_SCROLLBACK = 500;
+const MAX_SCROLLBACK = 2000;
+
+function clampScrollback(value: number | undefined): number {
+	const scrollback = Number(value ?? 1000);
+	if (!Number.isFinite(scrollback)) return 1000;
+	return Math.min(MAX_SCROLLBACK, Math.max(MIN_SCROLLBACK, scrollback));
+}
+
 export default function Terminal({ terminalId, isVisible }: Props) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<XTerm | null>(null);
@@ -76,9 +85,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			fontFamily:
 				settings?.fontFamily ||
 				"'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
-			cursorBlink: settings?.cursorBlink ?? true,
+			cursorBlink: settings?.cursorBlink ?? false,
 			cursorStyle: settings?.cursorStyle || "bar",
-			scrollback: settings?.scrollback || 2000,
+			scrollback: clampScrollback(settings?.scrollback),
 			allowProposedApi: true,
 			theme: currentTheme ? buildXtermTheme(currentTheme.terminal) : undefined,
 			letterSpacing: 0,
@@ -245,7 +254,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			xtermRef.current.options.fontFamily = settings.fontFamily;
 			xtermRef.current.options.cursorBlink = settings.cursorBlink;
 			xtermRef.current.options.cursorStyle = settings.cursorStyle;
-			xtermRef.current.options.scrollback = settings.scrollback;
+			xtermRef.current.options.scrollback = clampScrollback(
+				settings.scrollback,
+			);
 			safeFit();
 		} catch (_e) {
 			// ignore

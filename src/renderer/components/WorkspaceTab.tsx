@@ -67,7 +67,8 @@ export default function WorkspaceTab({
 		setIsEditing(true);
 	};
 
-	const handleInputKeyDown = (e: React.KeyboardEvent) => {
+	const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		e.stopPropagation();
 		if (e.key === "Enter") {
 			e.preventDefault();
 			commitRename();
@@ -143,6 +144,7 @@ export default function WorkspaceTab({
 					onBlur={commitRename}
 					onKeyDown={handleInputKeyDown}
 					onClick={(e) => e.stopPropagation()}
+					onMouseDown={(e) => e.stopPropagation()}
 					className="text-xs bg-connexio-bg-tertiary text-connexio-text border border-connexio-accent rounded px-1 py-0.5 outline-none min-w-[60px] max-w-[140px] w-full"
 					maxLength={30}
 				/>
