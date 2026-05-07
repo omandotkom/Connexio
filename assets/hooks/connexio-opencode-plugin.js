@@ -1,6 +1,6 @@
 // Connexio notification plugin for OpenCode
 // Sends notification to Connexio when OpenCode session becomes idle
-// Install: Copy to ~/.opencode/plugins/connexio-notify.js
+// Install: Copy to ~/.config/opencode/plugin/connexio-notify.js
 
 export const ConnexioNotificationPlugin = async ({ client }) => ({
 	event: async ({ event }) => {
@@ -33,7 +33,17 @@ export const ConnexioNotificationPlugin = async ({ client }) => ({
 			// Ignore — use default body
 		}
 
-		const message = `opencode|OpenCode|${body}`;
+		const payload = {
+			provider: "opencode",
+			title: "OpenCode",
+			body,
+			projectId: process.env.CONNEXIO_PROJECT_ID,
+			projectName: process.env.CONNEXIO_PROJECT_NAME,
+			tabId: process.env.CONNEXIO_TAB_ID,
+			tabLabel: process.env.CONNEXIO_TAB_LABEL,
+			terminalId: process.env.CONNEXIO_TERMINAL_ID,
+		};
+		const message = JSON.stringify(payload);
 
 		try {
 			const { createConnection } = await import("net");

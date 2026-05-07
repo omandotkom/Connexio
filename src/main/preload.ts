@@ -14,8 +14,16 @@ ipcRenderer.setMaxListeners(50);
 
 contextBridge.exposeInMainWorld("connexio", {
 	terminal: {
-		create: (projectPath: string, shell?: string) =>
-			ipcRenderer.invoke("terminal:create", projectPath, shell),
+		create: (
+			projectPath: string,
+			shell?: string,
+			context?: {
+				projectId: string;
+				projectName: string;
+				tabId: string;
+				tabLabel: string;
+			},
+		) => ipcRenderer.invoke("terminal:create", projectPath, shell, context),
 		write: (id: string, data: string) =>
 			ipcRenderer.invoke("terminal:write", id, data),
 		resize: (id: string, cols: number, rows: number) =>
@@ -160,6 +168,19 @@ contextBridge.exposeInMainWorld("connexio", {
 			ipcRenderer.on("notification:received", listener);
 			return () =>
 				ipcRenderer.removeListener("notification:received", listener);
+		},
+		onNavigate: (
+			cb: (
+				notification: import("../shared/types").ConnexioNotification,
+			) => void,
+		) => {
+			const listener = (
+				_e: IpcRendererEvent,
+				notification: import("../shared/types").ConnexioNotification,
+			) => cb(notification);
+			ipcRenderer.on("notification:navigate", listener);
+			return () =>
+				ipcRenderer.removeListener("notification:navigate", listener);
 		},
 		getProviders: () => ipcRenderer.invoke("notification:get-providers"),
 		installHook: (providerId: string) =>

@@ -162,6 +162,9 @@ export interface ConnexioNotification {
 	body: string;
 	tabId?: string;
 	projectId?: string;
+	terminalId?: string;
+	projectName?: string;
+	tabLabel?: string;
 	timestamp: number;
 	isRead: boolean;
 }

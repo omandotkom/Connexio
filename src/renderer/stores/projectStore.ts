@@ -6,7 +6,7 @@ import type {
 	WorkspaceTabState,
 } from "../../shared/types";
 
-interface TerminalTab {
+export interface TerminalTab {
 	id: string;
 	label: string;
 	shell?: string;
@@ -212,13 +212,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		const existingTabs = workspaceTabs[projectId] || [];
 		const tabLabel = label || `Terminal ${existingTabs.length + 1}`;
 
+		const newTabId = uuid();
 		const terminalId = await window.connexio.terminal.create(
 			project.path,
 			shell,
+			{
+				projectId,
+				projectName: project.name,
+				tabId: newTabId,
+				tabLabel,
+			},
 		);
 
 		const newTab: TerminalTab = {
-			id: uuid(),
+			id: newTabId,
 			label: tabLabel,
 			shell,
 			terminalId,

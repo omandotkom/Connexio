@@ -26,7 +26,18 @@ if ($Event -eq "notification") {
     $body = "Needs attention"
 }
 
-$message = "claude|$title|$body"
+$payload = @{
+    provider = "claude"
+    title = $title
+    body = $body
+    projectId = $env:CONNEXIO_PROJECT_ID
+    projectName = $env:CONNEXIO_PROJECT_NAME
+    tabId = $env:CONNEXIO_TAB_ID
+    tabLabel = $env:CONNEXIO_TAB_LABEL
+    terminalId = $env:CONNEXIO_TERMINAL_ID
+}
+
+$message = $payload | ConvertTo-Json -Compress
 
 try {
     $client = New-Object System.Net.Sockets.TcpClient("127.0.0.1", [int]$port)

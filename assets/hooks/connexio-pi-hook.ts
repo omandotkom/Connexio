@@ -2,17 +2,15 @@
 // Sends notification to Connexio when Pi agent finishes processing
 // Auto-loaded from ~/.pi/agent/extensions/
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createConnection } from "net";
 
-export default function (pi: ExtensionAPI) {
-	pi.on("agent_end", async (event, ctx) => {
+export default function (pi: any) {
+	pi.on("agent_end", async (event) => {
 		const port = process.env.CONNEXIO_NOTIFICATION_PORT;
 		if (!port) return;
 
 		let body = "Task completed";
 
-		// Extract last assistant message
 		if (event.messages && event.messages.length > 0) {
 			const lastAssistant = [...event.messages]
 				.reverse()
@@ -33,7 +31,17 @@ export default function (pi: ExtensionAPI) {
 			}
 		}
 
-		const message = `pi|Pi Agent|${body}`;
+		const payload = {
+			provider: "pi",
+			title: "Pi Agent",
+			body,
+			projectId: process.env.CONNEXIO_PROJECT_ID,
+			projectName: process.env.CONNEXIO_PROJECT_NAME,
+			tabId: process.env.CONNEXIO_TAB_ID,
+			tabLabel: process.env.CONNEXIO_TAB_LABEL,
+			terminalId: process.env.CONNEXIO_TERMINAL_ID,
+		};
+		const message = JSON.stringify(payload);
 
 		try {
 			const conn = createConnection({

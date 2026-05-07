@@ -42,6 +42,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 		remove,
 		clear,
 		handleIncoming,
+		navigateToNotification,
 	} = useNotificationStore();
 
 	const sendTestNotification = () => {
@@ -152,7 +153,11 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 						<NotificationItem
 							key={notification.id}
 							notification={notification}
-							onMarkRead={() => markRead(notification.id)}
+							onSelect={() => {
+								markRead(notification.id);
+								navigateToNotification(notification);
+								onClose();
+							}}
 							onRemove={() => remove(notification.id)}
 						/>
 					))
@@ -164,11 +169,11 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 
 function NotificationItem({
 	notification,
-	onMarkRead,
+	onSelect,
 	onRemove,
 }: {
 	notification: ConnexioNotification;
-	onMarkRead: () => void;
+	onSelect: () => void;
 	onRemove: () => void;
 }) {
 	const timeAgo = getTimeAgo(notification.timestamp);
@@ -178,9 +183,9 @@ function NotificationItem({
 			className={`group flex items-start gap-2.5 px-3 py-2.5 border-b border-connexio-border/50 hover:bg-connexio-bg-tertiary/50 transition-colors cursor-pointer ${
 				!notification.isRead ? "bg-connexio-accent/5" : ""
 			}`}
-			onClick={onMarkRead}
+			onClick={onSelect}
 			onKeyDown={(e) => {
-				if (e.key === "Enter") onMarkRead();
+				if (e.key === "Enter") onSelect();
 			}}
 			role="button"
 			tabIndex={0}

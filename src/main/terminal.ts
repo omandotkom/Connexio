@@ -10,6 +10,13 @@ interface TerminalEntry {
 	rows: number;
 }
 
+interface TerminalContext {
+	projectId: string;
+	projectName: string;
+	tabId: string;
+	tabLabel: string;
+}
+
 const terminals: Map<string, TerminalEntry> = new Map();
 let terminalCounter = 0;
 
@@ -49,7 +56,7 @@ function isValidDirectory(dirPath: string): boolean {
 export function setupTerminalIPC() {
 	ipcMain.handle(
 		"terminal:create",
-		(_event, projectPath: string, shell?: string) => {
+		(_event, projectPath: string, shell?: string, context?: TerminalContext) => {
 			const id = `term-${++terminalCounter}`;
 			const shellPath = shell || getDefaultShell();
 			const cwd = isValidDirectory(projectPath) ? projectPath : os.homedir();
@@ -68,10 +75,17 @@ export function setupTerminalIPC() {
 					env.LANG = "en_US.UTF-8";
 				}
 
-				// Inject notification server port so AI agent hooks can connect
+				// Inject notification context so AI agent hooks can connect and identify the source tab
 				const notifPort = getNotificationServerPort();
 				if (notifPort) {
 					env.CONNEXIO_NOTIFICATION_PORT = String(notifPort);
+				}
+				if (context) {
+					env.CONNEXIO_PROJECT_ID = context.projectId;
+					env.CONNEXIO_PROJECT_NAME = context.projectName;
+					env.CONNEXIO_TAB_ID = context.tabId;
+					env.CONNEXIO_TAB_LABEL = context.tabLabel;
+					env.CONNEXIO_TERMINAL_ID = id;
 				}
 
 				const ptyProcess = pty.spawn(shellPath, [], {

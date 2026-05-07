@@ -20,6 +20,7 @@ export default function App() {
 		loadNotifications,
 		loadSettings: loadNotifSettings,
 		handleIncoming,
+		navigateToNotification,
 	} = useNotificationStore();
 
 	useEffect(() => {
@@ -41,6 +42,14 @@ export default function App() {
 		const unsubscribe = window.connexio.notification.onReceived(handleIncoming);
 		return unsubscribe;
 	}, [handleIncoming]);
+
+	// Navigate when native OS notification is clicked
+	useEffect(() => {
+		const unsubscribe = window.connexio.notification.onNavigate(
+			navigateToNotification,
+		);
+		return unsubscribe;
+	}, [navigateToNotification]);
 
 	return (
 		<div className="flex flex-col h-screen w-screen bg-connexio-bg">

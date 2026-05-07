@@ -27,6 +27,7 @@ interface NotificationStore {
 	clear: () => Promise<void>;
 	togglePanel: () => void;
 	closePanel: () => void;
+	navigateToNotification: (notification: ConnexioNotification) => void;
 
 	// Real-time
 	handleIncoming: (notification: ConnexioNotification) => void;
@@ -98,6 +99,16 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 
 	closePanel: () => {
 		set({ isOpen: false });
+	},
+
+	navigateToNotification: (notification: ConnexioNotification) => {
+		if (!notification.projectId || !notification.tabId) return;
+		// Import lazily to avoid circular dependency at module init time
+		import("./projectStore").then(({ useProjectStore }) => {
+			const projectStore = useProjectStore.getState();
+			projectStore.setActiveProject(notification.projectId!);
+			projectStore.setActiveTerminalTab(notification.projectId!, notification.tabId!);
+		});
 	},
 
 	handleIncoming: (notification: ConnexioNotification) => {

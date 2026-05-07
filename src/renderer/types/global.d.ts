@@ -1,7 +1,16 @@
 // Type declarations for the Connexio preload API
 interface ConnexioAPI {
 	terminal: {
-		create: (projectPath: string, shell?: string) => Promise<string>;
+		create: (
+			projectPath: string,
+			shell?: string,
+			context?: {
+				projectId: string;
+				projectName: string;
+				tabId: string;
+				tabLabel: string;
+			},
+		) => Promise<string>;
 		write: (id: string, data: string) => Promise<void>;
 		resize: (id: string, cols: number, rows: number) => Promise<void>;
 		close: (id: string) => Promise<void>;
@@ -130,6 +139,11 @@ interface ConnexioAPI {
 		) => Promise<import("../../shared/types").NotificationSettings>;
 		getPort: () => Promise<number | null>;
 		onReceived: (
+			cb: (
+				notification: import("../../shared/types").ConnexioNotification,
+			) => void,
+		) => () => void;
+		onNavigate: (
 			cb: (
 				notification: import("../../shared/types").ConnexioNotification,
 			) => void,
