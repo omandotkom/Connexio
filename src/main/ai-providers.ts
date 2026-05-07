@@ -207,12 +207,8 @@ function uninstallOpenCodeHook(): { success: boolean; error?: string } {
 // Pi Agent
 // ============================================
 
-function getPiHooksDir(): string {
-	return path.join(getHomedir(), ".pi", "hooks");
-}
-
-function getPiSettingsPath(): string {
-	return path.join(getHomedir(), ".pi", "agent", "settings.json");
+function getPiExtensionsDir(): string {
+	return path.join(getHomedir(), ".pi", "agent", "extensions");
 }
 
 function isPiInstalled(): boolean {
@@ -220,49 +216,23 @@ function isPiInstalled(): boolean {
 }
 
 function isPiHookInstalled(): boolean {
-	const hookPath = path.join(getPiHooksDir(), "connexio-notify.ts");
-	if (!fs.existsSync(hookPath)) return false;
-
-	// Also check if referenced in settings
-	const settingsPath = getPiSettingsPath();
-	if (!fs.existsSync(settingsPath)) return false;
-	try {
-		const content = fs.readFileSync(settingsPath, "utf-8");
-		return content.includes("connexio-notify");
-	} catch {
-		return false;
-	}
+	const extPath = path.join(getPiExtensionsDir(), "connexio-notify.ts");
+	return fs.existsSync(extPath);
 }
 
 function installPiHook(): { success: boolean; error?: string } {
 	try {
-		// Copy hook file
-		const hooksDir = getPiHooksDir();
-		if (!fs.existsSync(hooksDir)) {
-			fs.mkdirSync(hooksDir, { recursive: true });
+		// Copy extension to ~/.pi/agent/extensions/
+		// Pi auto-loads all .ts files in this directory
+		const extDir = getPiExtensionsDir();
+		if (!fs.existsSync(extDir)) {
+			fs.mkdirSync(extDir, { recursive: true });
 		}
 
 		const source = path.join(getHooksDir(), "connexio-pi-hook.ts");
-		const dest = path.join(hooksDir, "connexio-notify.ts");
+		const dest = path.join(extDir, "connexio-notify.ts");
 		fs.copyFileSync(source, dest);
 
-		// Add to settings.json
-		const settingsPath = getPiSettingsPath();
-		let settings: Record<string, any> = {};
-		if (fs.existsSync(settingsPath)) {
-			// Backup
-			const backupPath = settingsPath + ".connexio-backup";
-			fs.copyFileSync(settingsPath, backupPath);
-			settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-		}
-
-		const hookRef = "~/.pi/hooks/connexio-notify.ts";
-		if (!settings.hooks) settings.hooks = [];
-		if (!settings.hooks.includes(hookRef)) {
-			settings.hooks.push(hookRef);
-		}
-
-		fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
 		return { success: true };
 	} catch (err: any) {
 		return { success: false, error: err.message };
@@ -271,31 +241,10 @@ function installPiHook(): { success: boolean; error?: string } {
 
 function uninstallPiHook(): { success: boolean; error?: string } {
 	try {
-		// Remove hook file
-		const hookPath = path.join(getPiHooksDir(), "connexio-notify.ts");
-		if (fs.existsSync(hookPath)) {
-			fs.unlinkSync(hookPath);
+		const extPath = path.join(getPiExtensionsDir(), "connexio-notify.ts");
+		if (fs.existsSync(extPath)) {
+			fs.unlinkSync(extPath);
 		}
-
-		// Remove from settings.json
-		const settingsPath = getPiSettingsPath();
-		if (fs.existsSync(settingsPath)) {
-			const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-			if (Array.isArray(settings.hooks)) {
-				settings.hooks = settings.hooks.filter(
-					(h: string) => !h.includes("connexio-notify"),
-				);
-				if (settings.hooks.length === 0) {
-					delete settings.hooks;
-				}
-			}
-			fs.writeFileSync(
-				settingsPath,
-				JSON.stringify(settings, null, 2),
-				"utf-8",
-			);
-		}
-
 		return { success: true };
 	} catch (err: any) {
 		return { success: false, error: err.message };

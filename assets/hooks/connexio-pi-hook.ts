@@ -1,36 +1,22 @@
-// Connexio notification hook for Pi Agent
+// Connexio notification extension for Pi Agent
 // Sends notification to Connexio when Pi agent finishes processing
-// Install: Add to ~/.pi/hooks/connexio-notify.ts and reference in settings.json
+// Auto-loaded from ~/.pi/agent/extensions/
 
-import type { HookAPI } from "@mariozechner/pi-coding-agent/hooks";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createConnection } from "net";
 
-export default function (pi: HookAPI) {
-	pi.on("agent_end", async (event, ctx) => {
+export default function (pi: ExtensionAPI) {
+	pi.on("agent_response_end", async (event) => {
 		const port = process.env.CONNEXIO_NOTIFICATION_PORT;
 		if (!port) return;
 
-		const messageCount = event.messages?.length ?? 0;
-		let body = `Session ended with ${messageCount} messages`;
+		let body = "Task completed";
 
-		// Try to get last assistant message
-		if (event.messages && event.messages.length > 0) {
-			const lastMsg = [...event.messages]
-				.reverse()
-				.find((m: any) => m.role === "assistant");
-			if (lastMsg && lastMsg.content) {
-				const text =
-					typeof lastMsg.content === "string"
-						? lastMsg.content
-						: Array.isArray(lastMsg.content)
-							? lastMsg.content
-									.filter((p: any) => p.type === "text")
-									.map((p: any) => p.text || "")
-									.join("")
-							: "";
-				if (text) {
-					body = text.replace(/[\n\r|]+/g, " ").slice(0, 200);
-				}
+		// Try to extract summary from event
+		if (event && typeof event === "object") {
+			const msg = (event as any).message || (event as any).content;
+			if (typeof msg === "string" && msg.length > 0) {
+				body = msg.replace(/[\n\r|]+/g, " ").slice(0, 200);
 			}
 		}
 
