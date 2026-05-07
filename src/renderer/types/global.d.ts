@@ -134,9 +134,7 @@ interface ConnexioAPI {
 				notification: import("../../shared/types").ConnexioNotification,
 			) => void,
 		) => () => void;
-		getProviders: () => Promise<
-			import("../../shared/types").AIProvider[]
-		>;
+		getProviders: () => Promise<import("../../shared/types").AIProvider[]>;
 		installHook: (
 			providerId: string,
 		) => Promise<{ success: boolean; error?: string }>;

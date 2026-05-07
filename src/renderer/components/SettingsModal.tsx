@@ -15,7 +15,12 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
 import AIIntegrationsSettings from "./AIIntegrationsSettings";
 
-type SettingsTab = "general" | "terminal" | "appearance" | "notifications" | "about";
+type SettingsTab =
+	| "general"
+	| "terminal"
+	| "appearance"
+	| "notifications"
+	| "about";
 
 const MIN_SCROLLBACK = 500;
 const MAX_SCROLLBACK = 2000;

@@ -19,11 +19,12 @@ function getHomedir(): string {
 
 function getHooksDir(): string {
 	// In production: hooks are in resources/assets/hooks/
-	// In dev: hooks are in assets/hooks/
+	// In dev: hooks are in project-root/assets/hooks/
 	if (app.isPackaged) {
 		return path.join(process.resourcesPath, "assets", "hooks");
 	}
-	return path.join(__dirname, "..", "..", "assets", "hooks");
+	// Dev: __dirname is dist/main/main/, need to go up 3 levels to project root
+	return path.join(app.getAppPath(), "assets", "hooks");
 }
 
 // ============================================
@@ -37,7 +38,14 @@ function getClaudeSettingsPath(): string {
 function isClaudeInstalled(): boolean {
 	const paths = [
 		path.join(getHomedir(), ".claude"),
-		path.join(getHomedir(), "AppData", "Local", "Programs", "claude", "claude.exe"),
+		path.join(
+			getHomedir(),
+			"AppData",
+			"Local",
+			"Programs",
+			"claude",
+			"claude.exe",
+		),
 	];
 	return paths.some((p) => fs.existsSync(p));
 }
@@ -281,7 +289,11 @@ function uninstallPiHook(): { success: boolean; error?: string } {
 					delete settings.hooks;
 				}
 			}
-			fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+			fs.writeFileSync(
+				settingsPath,
+				JSON.stringify(settings, null, 2),
+				"utf-8",
+			);
 		}
 
 		return { success: true };
@@ -317,7 +329,10 @@ export function getProviders(): AIProvider[] {
 	];
 }
 
-export function installHook(providerId: string): { success: boolean; error?: string } {
+export function installHook(providerId: string): {
+	success: boolean;
+	error?: string;
+} {
 	switch (providerId) {
 		case "claude":
 			return installClaudeHook();
@@ -330,7 +345,10 @@ export function installHook(providerId: string): { success: boolean; error?: str
 	}
 }
 
-export function uninstallHook(providerId: string): { success: boolean; error?: string } {
+export function uninstallHook(providerId: string): {
+	success: boolean;
+	error?: string;
+} {
 	switch (providerId) {
 		case "claude":
 			return uninstallClaudeHook();

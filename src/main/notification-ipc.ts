@@ -55,7 +55,10 @@ export function setupNotificationIPC(): void {
 		return installHook(providerId);
 	});
 
-	ipcMain.handle("notification:uninstall-hook", (_event, providerId: string) => {
-		return uninstallHook(providerId);
-	});
+	ipcMain.handle(
+		"notification:uninstall-hook",
+		(_event, providerId: string) => {
+			return uninstallHook(providerId);
+		},
+	);
 }
