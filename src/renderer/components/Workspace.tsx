@@ -2,6 +2,7 @@ import { ListTodo, PanelRightClose, Server } from "lucide-react";
 import { useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import CommandTimer from "./CommandTimer";
+import ConfirmDialog from "./ConfirmDialog";
 import GitStatusBar from "./GitStatusBar";
 import ShellPicker from "./ShellPicker";
 import SSHPanel from "./SSHPanel";
@@ -30,6 +31,9 @@ export default function Workspace() {
 	const [dragSide, setDragSide] = useState<"left" | "right" | null>(null);
 	const [showSidePanel, setShowSidePanel] = useState(false);
 	const [sidePanelTab, setSidePanelTab] = useState<SidePanelTab>("tasks");
+	const [closeConfirmTabId, setCloseConfirmTabId] = useState<string | null>(
+		null,
+	);
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
 	if (!activeProjectId) return null;
@@ -97,6 +101,22 @@ export default function Workspace() {
 				window.connexio.terminal.write(newTab.terminalId, `${command}\r`);
 			}
 		}, 500);
+	};
+
+	// Close tab with confirmation
+	const handleCloseTab = (tabId: string) => {
+		setCloseConfirmTabId(tabId);
+	};
+
+	const confirmCloseTab = () => {
+		if (closeConfirmTabId) {
+			closeTerminalTab(activeProjectId, closeConfirmTabId);
+			setCloseConfirmTabId(null);
+		}
+	};
+
+	const cancelCloseTab = () => {
+		setCloseConfirmTabId(null);
 	};
 
 	const toggleSidePanel = (tab: SidePanelTab) => {
@@ -171,7 +191,7 @@ export default function Workspace() {
 							index={index}
 							canClose={tabs.length > 1}
 							onSelect={() => setActiveTerminalTab(activeProjectId, tab.id)}
-							onClose={() => closeTerminalTab(activeProjectId, tab.id)}
+							onClose={() => handleCloseTab(tab.id)}
 							onRename={(newLabel) =>
 								renameTerminalTab(activeProjectId, tab.id, newLabel)
 							}
@@ -182,15 +202,15 @@ export default function Workspace() {
 							dragSide={dragOverIndex === index ? dragSide : null}
 						/>
 					))}
-				</div>
 
-				{/* Add tab with shell picker */}
-				<div className="mx-1">
-					<ShellPicker
-						onSelect={(shell) =>
-							openTerminalTab(activeProjectId, undefined, shell)
-						}
-					/>
+					{/* Add tab — inline after last tab */}
+					<div className="flex-shrink-0 ml-0.5">
+						<ShellPicker
+							onSelect={(shell) =>
+								openTerminalTab(activeProjectId, undefined, shell)
+							}
+						/>
+					</div>
 				</div>
 			</div>
 
@@ -259,6 +279,19 @@ export default function Workspace() {
 					</div>
 				)}
 			</div>
+
+			{/* Close tab confirmation dialog */}
+			{closeConfirmTabId && (
+				<ConfirmDialog
+					title="Close Terminal"
+					message="Are you sure you want to close this terminal? Any running process will be terminated."
+					confirmLabel="Close"
+					cancelLabel="Cancel"
+					variant="warning"
+					onConfirm={confirmCloseTab}
+					onCancel={cancelCloseTab}
+				/>
+			)}
 		</div>
 	);
 }

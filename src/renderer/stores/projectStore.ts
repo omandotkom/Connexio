@@ -333,39 +333,47 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 			const restoredTabs: Record<string, TerminalTab[]> = {};
 			const restoredActiveIds: Record<string, string> = {};
 
-			// Restore tabs for each project — create new terminal processes
-			for (const [projectId, tabStates] of Object.entries(saved.projectTabs)) {
-				const project = projects.find((p) => p.id === projectId);
-				if (!project || tabStates.length === 0) continue;
+			// Restore tabs for each project — create terminal processes
+			// Projects restore in parallel, tabs within a project are sequential
+			// to avoid race conditions with xterm.js mounting
+			const projectEntries = Object.entries(saved.projectTabs)
+				.map(([projectId, tabStates]) => ({
+					projectId,
+					tabStates,
+					project: projects.find((p) => p.id === projectId),
+				}))
+				.filter((e) => e.project && e.tabStates.length > 0);
 
-				const tabs: TerminalTab[] = [];
-				for (const tabState of tabStates) {
-					try {
-						const terminalId = await window.connexio.terminal.create(
-							project.path,
-							tabState.shell,
-						);
-						tabs.push({
-							id: tabState.id,
-							label: tabState.label,
-							shell: tabState.shell,
-							terminalId,
-						});
-					} catch {
-						// Skip tabs that fail to create
+			await Promise.all(
+				projectEntries.map(async ({ projectId, tabStates, project }) => {
+					const tabs: TerminalTab[] = [];
+					for (const tabState of tabStates) {
+						try {
+							const terminalId = await window.connexio.terminal.create(
+								project!.path,
+								tabState.shell,
+							);
+							tabs.push({
+								id: tabState.id,
+								label: tabState.label,
+								shell: tabState.shell,
+								terminalId,
+							});
+						} catch {
+							// Skip tabs that fail to create
+						}
 					}
-				}
 
-				if (tabs.length > 0) {
-					restoredTabs[projectId] = tabs;
-					// Restore active tab or default to first
-					const savedActiveId = saved.activeTabIds[projectId];
-					const activeExists = tabs.find((t) => t.id === savedActiveId);
-					restoredActiveIds[projectId] = activeExists
-						? savedActiveId
-						: tabs[0].id;
-				}
-			}
+					if (tabs.length > 0) {
+						restoredTabs[projectId] = tabs;
+						const savedActiveId = saved.activeTabIds[projectId];
+						const activeExists = tabs.find((t) => t.id === savedActiveId);
+						restoredActiveIds[projectId] = activeExists
+							? savedActiveId
+							: tabs[0].id;
+					}
+				}),
+			);
 
 			// Restore active project if it still exists
 			const activeProjectId =

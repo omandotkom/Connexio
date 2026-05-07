@@ -1,10 +1,11 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalThemeColors } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
+import TerminalContextMenu from "./TerminalContextMenu";
 import "@xterm/xterm/css/xterm.css";
 
 interface Props {
@@ -53,8 +54,50 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 	const fitAddonRef = useRef<FitAddon | null>(null);
 	// Global disposed flag — checked by ALL operations on this terminal
 	const disposedRef = useRef(false);
+	// Track visibility so the write batcher can check it
+	const visibleRef = useRef(isVisible ?? false);
+	visibleRef.current = isVisible ?? false;
 	const { currentTheme } = useThemeStore();
 	const { settings } = useSettingsStore();
+
+	// Context menu state
+	const [contextMenu, setContextMenu] = useState<{
+		x: number;
+		y: number;
+		hasSelection: boolean;
+	} | null>(null);
+
+	const handleContextMenu = useCallback((e: MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const xterm = xtermRef.current;
+		const hasSelection = !!(xterm && xterm.getSelection());
+		setContextMenu({ x: e.clientX, y: e.clientY, hasSelection });
+	}, []);
+
+	const handleCopy = useCallback(() => {
+		const xterm = xtermRef.current;
+		if (!xterm) return;
+		const selection = xterm.getSelection();
+		if (selection) {
+			navigator.clipboard.writeText(selection).catch(() => {});
+		}
+	}, []);
+
+	const handlePaste = useCallback(() => {
+		navigator.clipboard
+			.readText()
+			.then((text) => {
+				if (text && !disposedRef.current) {
+					window.connexio.terminal.write(terminalId, text);
+				}
+			})
+			.catch(() => {});
+	}, [terminalId]);
+
+	const closeContextMenu = useCallback(() => {
+		setContextMenu(null);
+	}, []);
 
 	// Safe wrapper: only call xterm/fitAddon if not disposed
 	const safeFit = () => {
@@ -107,9 +150,18 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		fitAddonRef.current = fitAddon;
 
 		// --- Write batcher ---
+		// Data from PTY is buffered and flushed in batches.
+		// When the terminal container is hidden (display:none, 0×0),
+		// xterm.write() crashes because viewport dimensions are undefined.
+		// We defer writes until the container is visible and has size.
 		let writeBuffer = "";
 		let writeRafId: number | null = null;
 		let writeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+		const isContainerReady = () => {
+			const el = containerRef.current;
+			return el != null && el.offsetWidth > 0 && el.offsetHeight > 0;
+		};
 
 		const flushWrites = () => {
 			writeRafId = null;
@@ -119,6 +171,12 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			}
 			if (disposedRef.current || writeBuffer.length === 0) {
 				writeBuffer = "";
+				return;
+			}
+			// Defer if container is hidden / has no size — xterm viewport
+			// is not initialised and write() would throw "dimensions" error
+			if (!isContainerReady()) {
+				writeRafId = requestAnimationFrame(flushWrites);
 				return;
 			}
 			const data = writeBuffer;
@@ -180,6 +238,10 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		const resizeObserver = new ResizeObserver(() => debouncedFit());
 		resizeObserver.observe(containerRef.current);
 
+		// --- Context menu (right-click) ---
+		const terminalEl = containerRef.current;
+		terminalEl.addEventListener("contextmenu", handleContextMenu);
+
 		const initTimer1 = setTimeout(safeFit, 50);
 		const initTimer2 = setTimeout(safeFit, 200);
 		const initTimer3 = setTimeout(safeFit, 500);
@@ -205,8 +267,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			selectionDisposable.dispose();
 			dataDisposable.dispose();
 
-			// 5. Disconnect resize observer
+			// 5. Disconnect resize observer & context menu
 			resizeObserver.disconnect();
+			terminalEl.removeEventListener("contextmenu", handleContextMenu);
 
 			// 6. Finally dispose xterm (after everything else is cleaned up)
 			try {
@@ -264,9 +327,21 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 	}, [settings]);
 
 	return (
-		<div
-			ref={containerRef}
-			className="terminal-container w-full h-full bg-connexio-bg"
-		/>
+		<>
+			<div
+				ref={containerRef}
+				className="terminal-container w-full h-full bg-connexio-bg"
+			/>
+			{contextMenu && (
+				<TerminalContextMenu
+					x={contextMenu.x}
+					y={contextMenu.y}
+					hasSelection={contextMenu.hasSelection}
+					onCopy={handleCopy}
+					onPaste={handlePaste}
+					onClose={closeContextMenu}
+				/>
+			)}
+		</>
 	);
 }

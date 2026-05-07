@@ -8,6 +8,10 @@ import type {
 	WorkspaceState,
 } from "../shared/types";
 
+// Prevent MaxListenersExceededWarning when many terminals are open
+// Each terminal registers its own listener on "terminal:data"
+ipcRenderer.setMaxListeners(50);
+
 contextBridge.exposeInMainWorld("connexio", {
 	terminal: {
 		create: (projectPath: string, shell?: string) =>
