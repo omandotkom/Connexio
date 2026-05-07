@@ -114,10 +114,8 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 		// Play sound if enabled
 		if (settings?.sound) {
 			try {
-				const soundUrl = new URL(
-					"../assets/notification.wav",
-					import.meta.url,
-				).href;
+				const soundUrl = new URL("../assets/notification.wav", import.meta.url)
+					.href;
 				const audio = new Audio(soundUrl);
 				audio.volume = settings.soundVolume ?? 0.5;
 				audio.play().catch(() => {});

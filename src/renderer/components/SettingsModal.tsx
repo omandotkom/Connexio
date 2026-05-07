@@ -648,11 +648,124 @@ function AboutSettings() {
 
 // === Notifications Settings ===
 function NotificationsSettings() {
+	const { settings, updateSettings } = useNotificationSettingsState();
+
+	const handleSoundToggle = (value: boolean) => {
+		if (settings) {
+			updateSettings({ ...settings, sound: value });
+		}
+	};
+
+	const handleVolumeChange = (value: number) => {
+		if (settings) {
+			updateSettings({ ...settings, soundVolume: value });
+		}
+	};
+
+	const handleTestSound = () => {
+		try {
+			const soundUrl = new URL(
+				"../assets/notification.wav",
+				import.meta.url,
+			).href;
+			const audio = new Audio(soundUrl);
+			audio.volume = settings?.soundVolume ?? 0.5;
+			audio.play().catch(() => {});
+		} catch {
+			// ignore
+		}
+	};
+
 	return (
 		<div className="space-y-5">
+			{/* Sound Settings */}
+			<div className="space-y-4">
+				<h3 className="text-xs font-semibold text-connexio-text-secondary uppercase tracking-wider">
+					Sound
+				</h3>
+
+				{/* Sound toggle */}
+				<div className="flex items-center justify-between">
+					<div>
+						<label className="block text-xs font-medium text-connexio-text-secondary">
+							Notification Sound
+						</label>
+						<p className="text-[10px] text-connexio-text-muted mt-0.5">
+							Play sound when notification arrives
+						</p>
+					</div>
+					<ToggleSwitch
+						checked={settings?.sound ?? true}
+						onChange={handleSoundToggle}
+					/>
+				</div>
+
+				{/* Volume slider */}
+				{settings?.sound && (
+					<div>
+						<label className="block text-xs font-medium text-connexio-text-secondary mb-1.5">
+							Volume
+						</label>
+						<div className="flex items-center gap-3">
+							<input
+								type="range"
+								min={0}
+								max={100}
+								value={Math.round((settings?.soundVolume ?? 0.5) * 100)}
+								onChange={(e) =>
+									handleVolumeChange(Number(e.target.value) / 100)
+								}
+								className="flex-1 accent-[var(--accent-color)]"
+							/>
+							<span className="text-xs text-connexio-text w-8 text-right">
+								{Math.round((settings?.soundVolume ?? 0.5) * 100)}%
+							</span>
+							<button
+								onClick={handleTestSound}
+								className="px-2 py-1 text-[10px] font-medium text-connexio-text-secondary bg-connexio-bg-tertiary border border-connexio-border rounded hover:border-connexio-accent hover:text-connexio-accent transition-colors"
+								type="button"
+							>
+								Test
+							</button>
+						</div>
+					</div>
+				)}
+
+				{/* Custom sound info */}
+				<div className="pt-2 border-t border-connexio-border">
+					<p className="text-[10px] text-connexio-text-muted/60 leading-relaxed">
+						Custom sound: replace{" "}
+						<code className="text-connexio-text-muted bg-connexio-bg px-1 rounded">
+							src/renderer/assets/notification.wav
+						</code>{" "}
+						with your own .wav file and restart.
+					</p>
+				</div>
+			</div>
+
+			{/* AI Integrations */}
 			<AIIntegrationsSettings />
 		</div>
 	);
+}
+
+function useNotificationSettingsState() {
+	const [settings, setSettings] =
+		useState<import("../../shared/types").NotificationSettings | null>(null);
+
+	useEffect(() => {
+		window.connexio.notification.getSettings().then(setSettings);
+	}, []);
+
+	const updateSettings = async (
+		newSettings: import("../../shared/types").NotificationSettings,
+	) => {
+		const updated =
+			await window.connexio.notification.updateSettings(newSettings);
+		setSettings(updated);
+	};
+
+	return { settings, loadSettings: () => {}, updateSettings };
 }
 
 // === Toggle Switch ===

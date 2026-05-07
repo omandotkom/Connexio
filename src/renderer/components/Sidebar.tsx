@@ -13,6 +13,7 @@ import { useState } from "react";
 import type { Project } from "../../shared/types";
 import { useProjectStore } from "../stores/projectStore";
 import AddProjectModal from "./AddProjectModal";
+import ConfirmDialog from "./ConfirmDialog";
 
 export default function Sidebar() {
 	const {
@@ -32,6 +33,8 @@ export default function Sidebar() {
 		new Set(["default"]),
 	);
 	const [showAddModal, setShowAddModal] = useState(false);
+	const [deleteConfirmProject, setDeleteConfirmProject] =
+		useState<Project | null>(null);
 
 	// Drag state
 	const [dragProjectId, setDragProjectId] = useState<string | null>(null);
@@ -260,13 +263,7 @@ export default function Sidebar() {
 											<button
 												onClick={(e) => {
 													e.stopPropagation();
-													if (
-														confirm(
-															`Remove "${project.name}" from Connexio?\n\nThis won't delete any files on disk.`,
-														)
-													) {
-														deleteProject(project.id);
-													}
+													setDeleteConfirmProject(project);
 												}}
 												className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/20 transition-all flex-shrink-0"
 												type="button"
@@ -292,6 +289,21 @@ export default function Sidebar() {
 
 			{showAddModal && (
 				<AddProjectModal onClose={() => setShowAddModal(false)} />
+			)}
+
+			{deleteConfirmProject && (
+				<ConfirmDialog
+					title="Remove Project"
+					message={`Remove "${deleteConfirmProject.name}" from Connexio? This won't delete any files on disk.`}
+					confirmLabel="Remove"
+					cancelLabel="Cancel"
+					variant="danger"
+					onConfirm={() => {
+						deleteProject(deleteConfirmProject.id);
+						setDeleteConfirmProject(null);
+					}}
+					onCancel={() => setDeleteConfirmProject(null)}
+				/>
 			)}
 		</>
 	);
