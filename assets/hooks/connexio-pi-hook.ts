@@ -6,17 +6,30 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createConnection } from "net";
 
 export default function (pi: ExtensionAPI) {
-	pi.on("agent_response_end", async (event) => {
+	pi.on("agent_end", async (event, ctx) => {
 		const port = process.env.CONNEXIO_NOTIFICATION_PORT;
 		if (!port) return;
 
 		let body = "Task completed";
 
-		// Try to extract summary from event
-		if (event && typeof event === "object") {
-			const msg = (event as any).message || (event as any).content;
-			if (typeof msg === "string" && msg.length > 0) {
-				body = msg.replace(/[\n\r|]+/g, " ").slice(0, 200);
+		// Extract last assistant message
+		if (event.messages && event.messages.length > 0) {
+			const lastAssistant = [...event.messages]
+				.reverse()
+				.find((m: any) => m.role === "assistant");
+			if (lastAssistant) {
+				const content = (lastAssistant as any).content;
+				if (typeof content === "string" && content.length > 0) {
+					body = content.replace(/[\n\r|]+/g, " ").slice(0, 200);
+				} else if (Array.isArray(content)) {
+					const text = content
+						.filter((p: any) => p.type === "text")
+						.map((p: any) => p.text || "")
+						.join("");
+					if (text) {
+						body = text.replace(/[\n\r|]+/g, " ").slice(0, 200);
+					}
+				}
 			}
 		}
 
