@@ -151,6 +151,28 @@ export interface GitStatus {
 	remoteUrl: string;
 }
 
+// Notifications
+export type NotificationSource = "agent" | "command" | "system";
+
+export interface ConnexioNotification {
+	id: string;
+	source: NotificationSource;
+	provider?: string; // "claude" | "opencode" | "codex" | "pi" etc.
+	title: string;
+	body: string;
+	tabId?: string;
+	projectId?: string;
+	timestamp: number;
+	isRead: boolean;
+}
+
+export interface NotificationSettings {
+	enabled: boolean;
+	sound: boolean;
+	showWhenFocused: boolean;
+	idleThreshold: number; // seconds, for generic idle detection
+}
+
 // IPC Channel names
 export const IPC = {
 	TERMINAL_CREATE: "terminal:create",

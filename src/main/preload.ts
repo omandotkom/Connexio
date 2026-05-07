@@ -135,4 +135,23 @@ contextBridge.exposeInMainWorld("connexio", {
 		isMaximized: () => ipcRenderer.invoke("app:is-maximized"),
 		getVersion: () => ipcRenderer.invoke("app:get-version"),
 	},
+
+	notification: {
+		list: () => ipcRenderer.invoke("notification:list"),
+		unreadCount: () => ipcRenderer.invoke("notification:unread-count"),
+		markRead: (id: string) => ipcRenderer.invoke("notification:mark-read", id),
+		markAllRead: () => ipcRenderer.invoke("notification:mark-all-read"),
+		remove: (id: string) => ipcRenderer.invoke("notification:remove", id),
+		clear: () => ipcRenderer.invoke("notification:clear"),
+		getSettings: () => ipcRenderer.invoke("notification:get-settings"),
+		updateSettings: (settings: import("../shared/types").NotificationSettings) =>
+			ipcRenderer.invoke("notification:update-settings", settings),
+		getPort: () => ipcRenderer.invoke("notification:get-port"),
+		onReceived: (cb: (notification: import("../shared/types").ConnexioNotification) => void) => {
+			const listener = (_e: IpcRendererEvent, notification: import("../shared/types").ConnexioNotification) =>
+				cb(notification);
+			ipcRenderer.on("notification:received", listener);
+			return () => ipcRenderer.removeListener("notification:received", listener);
+		},
+	},
 });

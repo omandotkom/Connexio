@@ -1,6 +1,7 @@
 import { Minus, Settings, Square, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
+import NotificationBell from "./NotificationBell";
 
 export default function TitleBar() {
 	const { openSettings } = useSettingsStore();
@@ -34,6 +35,7 @@ export default function TitleBar() {
 
 			{/* Window controls */}
 			<div className="titlebar-no-drag flex items-center gap-0.5">
+				<NotificationBell />
 				<button
 					onClick={openSettings}
 					className="p-1.5 rounded hover:bg-connexio-bg-tertiary transition-colors"

@@ -1,6 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import path from "path";
 import { setupGitIPC } from "./git";
+import { setupNotificationIPC } from "./notification-ipc";
+import {
+	startNotificationServer,
+	stopNotificationServer,
+} from "./notification-server";
 import { setupProjectIPC } from "./project";
 import { setupSessionIPC } from "./session";
 import { setupSettingsIPC } from "./settings";
@@ -147,6 +152,10 @@ app.whenReady().then(() => {
 	setupTasksIPC();
 	setupSSHIPC();
 	setupUpdaterIPC();
+	setupNotificationIPC();
+
+	// Start notification server (TCP localhost)
+	startNotificationServer();
 
 	createWindow();
 
@@ -162,9 +171,10 @@ app.whenReady().then(() => {
 	});
 });
 
-// Kill all terminals BEFORE quit to avoid node-pty fork issue
+// Kill all terminals and stop notification server BEFORE quit
 app.on("before-quit", () => {
 	killAllTerminals();
+	stopNotificationServer();
 });
 
 app.on("window-all-closed", () => {

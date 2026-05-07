@@ -115,6 +115,22 @@ interface ConnexioAPI {
 		isMaximized: () => Promise<boolean>;
 		getVersion: () => Promise<string>;
 	};
+	notification: {
+		list: () => Promise<import("../../shared/types").ConnexioNotification[]>;
+		unreadCount: () => Promise<number>;
+		markRead: (id: string) => Promise<void>;
+		markAllRead: () => Promise<void>;
+		remove: (id: string) => Promise<void>;
+		clear: () => Promise<void>;
+		getSettings: () => Promise<import("../../shared/types").NotificationSettings>;
+		updateSettings: (
+			settings: import("../../shared/types").NotificationSettings,
+		) => Promise<import("../../shared/types").NotificationSettings>;
+		getPort: () => Promise<number | null>;
+		onReceived: (
+			cb: (notification: import("../../shared/types").ConnexioNotification) => void,
+		) => () => void;
+	};
 }
 
 declare global {
