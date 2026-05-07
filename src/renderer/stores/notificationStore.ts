@@ -114,8 +114,14 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 		// Play sound if enabled
 		if (settings?.sound) {
 			try {
-				const soundUrl = new URL("../assets/notification.wav", import.meta.url)
-					.href;
+				let soundUrl: string;
+				if (settings.customSoundPath) {
+					// Use custom uploaded sound (file:// protocol for local files)
+					soundUrl = `file://${settings.customSoundPath.replace(/\\/g, "/")}`;
+				} else {
+					// Use default bundled sound
+					soundUrl = new URL("../assets/notification.wav", import.meta.url).href;
+				}
 				const audio = new Audio(soundUrl);
 				audio.volume = settings.soundVolume ?? 0.5;
 				audio.play().catch(() => {});

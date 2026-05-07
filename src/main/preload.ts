@@ -166,5 +166,9 @@ contextBridge.exposeInMainWorld("connexio", {
 			ipcRenderer.invoke("notification:install-hook", providerId),
 		uninstallHook: (providerId: string) =>
 			ipcRenderer.invoke("notification:uninstall-hook", providerId),
+		uploadSound: () => ipcRenderer.invoke("notification:upload-sound"),
+		removeCustomSound: () =>
+			ipcRenderer.invoke("notification:remove-custom-sound"),
+		getSoundPath: () => ipcRenderer.invoke("notification:get-sound-path"),
 	},
 });

@@ -664,15 +664,47 @@ function NotificationsSettings() {
 
 	const handleTestSound = () => {
 		try {
-			const soundUrl = new URL(
-				"../assets/notification.wav",
-				import.meta.url,
-			).href;
+			let soundUrl: string;
+			if (settings?.customSoundPath) {
+				soundUrl = `file://${settings.customSoundPath.replace(/\\/g, "/")}`;
+			} else {
+				soundUrl = new URL("../assets/notification.wav", import.meta.url).href;
+			}
 			const audio = new Audio(soundUrl);
 			audio.volume = settings?.soundVolume ?? 0.5;
 			audio.play().catch(() => {});
 		} catch {
 			// ignore
+		}
+	};
+
+	const handleUploadSound = async () => {
+		const result = await window.connexio.notification.uploadSound();
+		if (result.success) {
+			const updated = await window.connexio.notification.getSettings();
+			if (settings) {
+				updateSettings(updated);
+			}
+		}
+	};
+
+	const handleRemoveCustomSound = async () => {
+		await window.connexio.notification.removeCustomSound();
+		const updated = await window.connexio.notification.getSettings();
+		if (settings) {
+			updateSettings(updated);
+		}
+	};
+
+	const handleIdleToggle = (value: boolean) => {
+		if (settings) {
+			updateSettings({ ...settings, idleNotify: value });
+		}
+	};
+
+	const handleIdleThresholdChange = (value: number) => {
+		if (settings) {
+			updateSettings({ ...settings, idleThreshold: value });
 		}
 	};
 
@@ -731,16 +763,87 @@ function NotificationsSettings() {
 					</div>
 				)}
 
-				{/* Custom sound info */}
-				<div className="pt-2 border-t border-connexio-border">
-					<p className="text-[10px] text-connexio-text-muted/60 leading-relaxed">
-						Custom sound: replace{" "}
-						<code className="text-connexio-text-muted bg-connexio-bg px-1 rounded">
-							src/renderer/assets/notification.wav
-						</code>{" "}
-						with your own .wav file and restart.
-					</p>
+				{/* Custom sound upload */}
+				{settings?.sound && (
+					<div>
+						<label className="block text-xs font-medium text-connexio-text-secondary mb-1.5">
+							Custom Sound
+						</label>
+						<div className="flex items-center gap-2">
+							{settings.customSoundPath ? (
+								<>
+									<span className="text-[10px] text-green-400 truncate flex-1">
+										✓ Custom sound active
+									</span>
+									<button
+										onClick={handleRemoveCustomSound}
+										className="px-2 py-1 text-[10px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded hover:bg-red-500/20 transition-colors"
+										type="button"
+									>
+										Remove
+									</button>
+								</>
+							) : (
+								<button
+									onClick={handleUploadSound}
+									className="px-2.5 py-1 text-[10px] font-medium text-connexio-text-secondary bg-connexio-bg-tertiary border border-connexio-border rounded hover:border-connexio-accent hover:text-connexio-accent transition-colors"
+									type="button"
+								>
+									Upload .wav / .mp3 / .ogg
+								</button>
+							)}
+						</div>
+					</div>
+				)}
+			</div>
+
+			{/* Terminal Idle Notification */}
+			<div className="space-y-4">
+				<h3 className="text-xs font-semibold text-connexio-text-secondary uppercase tracking-wider">
+					Terminal Idle
+				</h3>
+
+				<div className="flex items-center justify-between">
+					<div>
+						<label className="block text-xs font-medium text-connexio-text-secondary">
+							Notify on Idle
+						</label>
+						<p className="text-[10px] text-connexio-text-muted mt-0.5">
+							Get notified when a watched terminal goes idle (e.g. npm install
+							finishes)
+						</p>
+					</div>
+					<ToggleSwitch
+						checked={settings?.idleNotify ?? false}
+						onChange={handleIdleToggle}
+					/>
 				</div>
+
+				{settings?.idleNotify && (
+					<div>
+						<label className="block text-xs font-medium text-connexio-text-secondary mb-1.5">
+							Idle Threshold
+						</label>
+						<div className="flex items-center gap-3">
+							<input
+								type="range"
+								min={3}
+								max={30}
+								value={settings?.idleThreshold ?? 5}
+								onChange={(e) =>
+									handleIdleThresholdChange(Number(e.target.value))
+								}
+								className="flex-1 accent-[var(--accent-color)]"
+							/>
+							<span className="text-xs text-connexio-text w-12 text-right">
+								{settings?.idleThreshold ?? 5}s
+							</span>
+						</div>
+						<p className="text-[10px] text-connexio-text-muted mt-1">
+							Seconds of silence before considering terminal idle
+						</p>
+					</div>
+				)}
 			</div>
 
 			{/* AI Integrations */}
@@ -750,8 +853,9 @@ function NotificationsSettings() {
 }
 
 function useNotificationSettingsState() {
-	const [settings, setSettings] =
-		useState<import("../../shared/types").NotificationSettings | null>(null);
+	const [settings, setSettings] = useState<
+		import("../../shared/types").NotificationSettings | null
+	>(null);
 
 	useEffect(() => {
 		window.connexio.notification.getSettings().then(setSettings);

@@ -141,6 +141,13 @@ interface ConnexioAPI {
 		uninstallHook: (
 			providerId: string,
 		) => Promise<{ success: boolean; error?: string }>;
+		uploadSound: () => Promise<{
+			success: boolean;
+			path?: string;
+			error?: string;
+		}>;
+		removeCustomSound: () => Promise<{ success: boolean }>;
+		getSoundPath: () => Promise<string | null>;
 	};
 }
 

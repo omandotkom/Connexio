@@ -170,7 +170,9 @@ export interface NotificationSettings {
 	enabled: boolean;
 	sound: boolean;
 	soundVolume: number; // 0.0 - 1.0
+	customSoundPath: string | null; // user-uploaded sound file path
 	showWhenFocused: boolean;
+	idleNotify: boolean; // notify when terminal goes idle
 	idleThreshold: number; // seconds, for generic idle detection
 }
 

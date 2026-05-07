@@ -1,4 +1,6 @@
-import { ipcMain } from "electron";
+import { app, dialog, ipcMain } from "electron";
+import fs from "fs";
+import path from "path";
 import type { NotificationSettings } from "../shared/types";
 import { getProviders, installHook, uninstallHook } from "./ai-providers";
 import { getNotificationServerPort } from "./notification-server";
@@ -61,4 +63,59 @@ export function setupNotificationIPC(): void {
 			return uninstallHook(providerId);
 		},
 	);
+
+	// Custom sound upload
+	ipcMain.handle("notification:upload-sound", async () => {
+		const result = await dialog.showOpenDialog({
+			title: "Select Notification Sound",
+			filters: [{ name: "Audio", extensions: ["wav", "mp3", "ogg"] }],
+			properties: ["openFile"],
+		});
+
+		if (result.canceled || result.filePaths.length === 0) {
+			return { success: false };
+		}
+
+		const sourcePath = result.filePaths[0];
+		const soundsDir = path.join(app.getPath("userData"), "sounds");
+
+		if (!fs.existsSync(soundsDir)) {
+			fs.mkdirSync(soundsDir, { recursive: true });
+		}
+
+		const ext = path.extname(sourcePath);
+		const destPath = path.join(soundsDir, `notification${ext}`);
+
+		try {
+			fs.copyFileSync(sourcePath, destPath);
+			// Update settings with custom path
+			const settings = store.getSettings();
+			store.updateSettings({ ...settings, customSoundPath: destPath });
+			return { success: true, path: destPath };
+		} catch (err: any) {
+			return { success: false, error: err.message };
+		}
+	});
+
+	// Remove custom sound
+	ipcMain.handle("notification:remove-custom-sound", () => {
+		const settings = store.getSettings();
+		if (settings.customSoundPath) {
+			try {
+				if (fs.existsSync(settings.customSoundPath)) {
+					fs.unlinkSync(settings.customSoundPath);
+				}
+			} catch {
+				// ignore
+			}
+		}
+		store.updateSettings({ ...settings, customSoundPath: null });
+		return { success: true };
+	});
+
+	// Get custom sound path for renderer to load
+	ipcMain.handle("notification:get-sound-path", () => {
+		const settings = store.getSettings();
+		return settings.customSoundPath;
+	});
 }

@@ -17,7 +17,9 @@ const store = new Store<{
 			enabled: true,
 			sound: true,
 			soundVolume: 0.5,
+			customSoundPath: null,
 			showWhenFocused: false,
+			idleNotify: false,
 			idleThreshold: 5,
 		},
 	},
@@ -76,7 +78,9 @@ class NotificationStore {
 			enabled: true,
 			sound: true,
 			soundVolume: 0.5,
+			customSoundPath: null,
 			showWhenFocused: false,
+			idleNotify: false,
 			idleThreshold: 5,
 		});
 	}
