@@ -4,31 +4,40 @@ import { useProjectStore } from "../stores/projectStore";
 
 /**
  * Hook that monitors terminal data activity and sends a notification
- * when a watched terminal goes idle (no output for X seconds).
+ * when a terminal goes idle (no output for X seconds).
  *
- * "Watched" means idleNotify is enabled in settings.
- * Only fires when the Connexio window is NOT focused.
+ * Only active when idleNotify is enabled in notification settings.
+ * Skips notification if user is focused on the idle terminal.
  */
 export function useTerminalIdleNotify() {
 	const { settings, handleIncoming } = useNotificationStore();
-	const { workspaceTabs, activeTabIds, activeProjectId } = useProjectStore();
+	const projectStore = useProjectStore();
 
-	// Track last data timestamp per terminal
-	const lastDataRef = useRef<Map<string, number>>(new Map());
+	// Use refs for values that change frequently to avoid re-subscribing
+	const storeRef = useRef(projectStore);
+	storeRef.current = projectStore;
+	const handleIncomingRef = useRef(handleIncoming);
+	handleIncomingRef.current = handleIncoming;
+	const settingsRef = useRef(settings);
+	settingsRef.current = settings;
+
+	// Track idle timers per terminal
 	const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
 		new Map(),
 	);
-	// Track which terminals have been "active" (received data since last idle)
+	// Track which terminals received data (to avoid notifying on terminals that never had output)
 	const wasActiveRef = useRef<Set<string>>(new Set());
 
-	useEffect(() => {
-		if (!settings?.idleNotify) return;
+	const idleNotify = settings?.idleNotify ?? false;
+	const idleThreshold = settings?.idleThreshold ?? 5;
 
-		const threshold = (settings.idleThreshold ?? 5) * 1000;
+	useEffect(() => {
+		if (!idleNotify) return;
+
+		const threshold = idleThreshold * 1000;
 
 		const unsubscribe = window.connexio.terminal.onData(
 			(terminalId: string, _data: string) => {
-				lastDataRef.current.set(terminalId, Date.now());
 				wasActiveRef.current.add(terminalId);
 
 				// Reset idle timer for this terminal
@@ -40,26 +49,31 @@ export function useTerminalIdleNotify() {
 				const timer = setTimeout(() => {
 					idleTimersRef.current.delete(terminalId);
 
-					// Only notify if terminal was active and window is not focused
+					// Only notify if terminal was active
 					if (!wasActiveRef.current.has(terminalId)) return;
 					wasActiveRef.current.delete(terminalId);
 
-					// Don't notify if window is focused and user is looking at this terminal
+					const currentSettings = settingsRef.current;
+					if (!currentSettings?.idleNotify) return;
+
+					// Don't notify if user is focused on this specific terminal
 					if (document.hasFocus()) {
-						// Check if this is the active terminal
+						const { activeProjectId, activeTabIds, workspaceTabs } =
+							storeRef.current;
 						if (activeProjectId) {
 							const activeTabId = activeTabIds[activeProjectId];
 							const tabs = workspaceTabs[activeProjectId] || [];
 							const activeTab = tabs.find((t) => t.id === activeTabId);
 							if (activeTab?.terminalId === terminalId) {
-								return; // User is looking at this terminal
+								return;
 							}
 						}
 					}
 
-					// Find tab label for this terminal
+					// Find tab label
 					let tabLabel = "Terminal";
-					for (const [_projectId, tabs] of Object.entries(workspaceTabs)) {
+					const { workspaceTabs } = storeRef.current;
+					for (const tabs of Object.values(workspaceTabs)) {
 						const tab = tabs.find((t) => t.terminalId === terminalId);
 						if (tab) {
 							tabLabel = tab.label;
@@ -67,11 +81,11 @@ export function useTerminalIdleNotify() {
 						}
 					}
 
-					handleIncoming({
+					handleIncomingRef.current({
 						id: crypto.randomUUID(),
 						source: "command",
 						title: "Terminal Idle",
-						body: `"${tabLabel}" has finished — no output for ${settings.idleThreshold}s`,
+						body: `"${tabLabel}" has finished — no output for ${currentSettings.idleThreshold}s`,
 						timestamp: Date.now(),
 						isRead: false,
 					});
@@ -83,19 +97,11 @@ export function useTerminalIdleNotify() {
 
 		return () => {
 			unsubscribe();
-			// Clear all timers
 			for (const timer of idleTimersRef.current.values()) {
 				clearTimeout(timer);
 			}
 			idleTimersRef.current.clear();
 			wasActiveRef.current.clear();
 		};
-	}, [
-		settings?.idleNotify,
-		settings?.idleThreshold,
-		activeProjectId,
-		activeTabIds,
-		workspaceTabs,
-		handleIncoming,
-	]);
+	}, [idleNotify, idleThreshold]);
 }

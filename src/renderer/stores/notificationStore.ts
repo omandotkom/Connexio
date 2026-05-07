@@ -4,6 +4,12 @@ import type {
 	NotificationSettings,
 } from "../../shared/types";
 
+// Shared audio instance to prevent overlapping sounds
+// biome-ignore lint/style/useLet: reassigned in handleIncoming
+let notificationAudio: HTMLAudioElement | null = null;
+// biome-ignore lint/style/useLet: reassigned in handleIncoming
+let lastSoundUrl: string | null = null;
+
 interface NotificationStore {
 	notifications: ConnexioNotification[];
 	unreadCount: number;
@@ -111,20 +117,27 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 			}
 		}, 4000);
 
-		// Play sound if enabled
+		// Play sound if enabled — uses shared Audio instance to prevent overlap
 		if (settings?.sound) {
 			try {
 				let soundUrl: string;
 				if (settings.customSoundPath) {
-					// Use custom uploaded sound (file:// protocol for local files)
 					soundUrl = `file://${settings.customSoundPath.replace(/\\/g, "/")}`;
 				} else {
-					// Use default bundled sound
-					soundUrl = new URL("../assets/notification.wav", import.meta.url).href;
+					soundUrl = new URL("../assets/notification.wav", import.meta.url)
+						.href;
 				}
-				const audio = new Audio(soundUrl);
-				audio.volume = settings.soundVolume ?? 0.5;
-				audio.play().catch(() => {});
+
+				// Reuse or create audio instance
+				if (!notificationAudio || lastSoundUrl !== soundUrl) {
+					notificationAudio = new Audio(soundUrl);
+					lastSoundUrl = soundUrl;
+				}
+
+				notificationAudio.volume = settings.soundVolume ?? 0.5;
+				// Reset to start if already playing (prevents overlap)
+				notificationAudio.currentTime = 0;
+				notificationAudio.play().catch(() => {});
 			} catch {
 				// Ignore audio errors
 			}
