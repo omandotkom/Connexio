@@ -157,8 +157,8 @@ function uninstallClaudeHook(): { success: boolean; error?: string } {
 // ============================================
 
 function getOpenCodePluginsDir(): string {
-	// OpenCode global plugins: ~/.config/opencode/plugins/
-	return path.join(getHomedir(), ".config", "opencode", "plugins");
+	// OpenCode global plugin: ~/.config/opencode/plugin/
+	return path.join(getHomedir(), ".config", "opencode", "plugin");
 }
 
 function isOpenCodeInstalled(): boolean {
