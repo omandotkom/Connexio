@@ -56,7 +56,12 @@ function isValidDirectory(dirPath: string): boolean {
 export function setupTerminalIPC() {
 	ipcMain.handle(
 		"terminal:create",
-		(_event, projectPath: string, shell?: string, context?: TerminalContext) => {
+		(
+			_event,
+			projectPath: string,
+			shell?: string,
+			context?: TerminalContext,
+		) => {
 			const id = `term-${++terminalCounter}`;
 			const shellPath = shell || getDefaultShell();
 			const cwd = isValidDirectory(projectPath) ? projectPath : os.homedir();

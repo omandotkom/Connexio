@@ -359,6 +359,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 							const terminalId = await window.connexio.terminal.create(
 								project!.path,
 								tabState.shell,
+								{
+									projectId,
+									projectName: project!.name,
+									tabId: tabState.id,
+									tabLabel: tabState.label,
+								},
 							);
 							tabs.push({
 								id: tabState.id,

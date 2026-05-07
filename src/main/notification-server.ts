@@ -100,7 +100,8 @@ function processMessage(raw: string): void {
 		store.add(notification);
 
 		// Send to renderer
-		const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+		const win =
+			BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
 		if (win && !win.isDestroyed()) {
 			win.webContents.send("notification:received", notification);
 		}
@@ -161,8 +162,15 @@ function parseNotification(line: string): ConnexioNotification | null {
 function showNativeNotification(notification: ConnexioNotification): void {
 	if (!Notification.isSupported()) return;
 
+	const contextParts = [notification.projectName, notification.tabLabel].filter(
+		Boolean,
+	);
+	const title = contextParts.length
+		? `${notification.title} — ${contextParts.join(" / ")}`
+		: notification.title;
+
 	const nativeNotification = new Notification({
-		title: notification.title,
+		title,
 		body: notification.body,
 		silent: true, // sound handled by renderer custom sound
 	});
