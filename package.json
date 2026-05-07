@@ -68,7 +68,8 @@
         "from": "assets/",
         "to": "assets/",
         "filter": [
-          "icon.*"
+          "icon.*",
+          "hooks/**/*"
         ]
       }
     ],

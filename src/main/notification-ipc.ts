@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import type { NotificationSettings } from "../shared/types";
+import { getProviders, installHook, uninstallHook } from "./ai-providers";
 import { getNotificationServerPort } from "./notification-server";
 import { getNotificationStore } from "./notification-store";
 
@@ -34,11 +35,27 @@ export function setupNotificationIPC(): void {
 		return store.getSettings();
 	});
 
-	ipcMain.handle("notification:update-settings", (_event, settings: NotificationSettings) => {
-		return store.updateSettings(settings);
-	});
+	ipcMain.handle(
+		"notification:update-settings",
+		(_event, settings: NotificationSettings) => {
+			return store.updateSettings(settings);
+		},
+	);
 
 	ipcMain.handle("notification:get-port", () => {
 		return getNotificationServerPort();
+	});
+
+	// AI Provider hooks
+	ipcMain.handle("notification:get-providers", () => {
+		return getProviders();
+	});
+
+	ipcMain.handle("notification:install-hook", (_event, providerId: string) => {
+		return installHook(providerId);
+	});
+
+	ipcMain.handle("notification:uninstall-hook", (_event, providerId: string) => {
+		return uninstallHook(providerId);
 	});
 }

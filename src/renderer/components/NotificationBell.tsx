@@ -1,4 +1,4 @@
-import { Bell, CheckCheck, Clock, Trash2, X } from "lucide-react";
+import { Bell, CheckCheck, Clock, Trash2, X, Zap } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ConnexioNotification } from "../../shared/types";
@@ -28,14 +28,42 @@ export default function NotificationBell() {
 				)}
 			</button>
 
-			{isOpen && createPortal(<NotificationPanel onClose={closePanel} />, document.body)}
+			{isOpen &&
+				createPortal(<NotificationPanel onClose={closePanel} />, document.body)}
 		</div>
 	);
 }
 
 function NotificationPanel({ onClose }: { onClose: () => void }) {
-	const { notifications, markRead, markAllRead, remove, clear } =
-		useNotificationStore();
+	const {
+		notifications,
+		markRead,
+		markAllRead,
+		remove,
+		clear,
+		handleIncoming,
+	} = useNotificationStore();
+
+	const sendTestNotification = () => {
+		const providers = ["claude", "opencode", "codex", "pi"];
+		const messages = [
+			"Task completed — fixed the login bug",
+			"Session idle — waiting for input",
+			"Build finished successfully",
+			"Refactoring done — 3 files changed",
+		];
+		const provider = providers[Math.floor(Math.random() * providers.length)];
+		const body = messages[Math.floor(Math.random() * messages.length)];
+		handleIncoming({
+			id: crypto.randomUUID(),
+			source: "agent",
+			provider,
+			title: `${provider.charAt(0).toUpperCase() + provider.slice(1)} Agent`,
+			body,
+			timestamp: Date.now(),
+			isRead: false,
+		});
+	};
 	const panelRef = useRef<HTMLDivElement>(null);
 
 	// Close on outside click
@@ -68,6 +96,15 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 					</span>
 				</div>
 				<div className="flex items-center gap-1">
+					{/* Test button — send fake notification */}
+					<button
+						onClick={sendTestNotification}
+						className="p-1 rounded hover:bg-connexio-bg-tertiary transition-colors"
+						title="Send test notification"
+						type="button"
+					>
+						<Zap size={12} className="text-yellow-400" />
+					</button>
 					{notifications.length > 0 && (
 						<>
 							<button

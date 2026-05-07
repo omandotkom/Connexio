@@ -1,5 +1,8 @@
 import Store from "electron-store";
-import type { ConnexioNotification, NotificationSettings } from "../shared/types";
+import type {
+	ConnexioNotification,
+	NotificationSettings,
+} from "../shared/types";
 
 const MAX_NOTIFICATIONS = 200;
 

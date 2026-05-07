@@ -144,14 +144,27 @@ contextBridge.exposeInMainWorld("connexio", {
 		remove: (id: string) => ipcRenderer.invoke("notification:remove", id),
 		clear: () => ipcRenderer.invoke("notification:clear"),
 		getSettings: () => ipcRenderer.invoke("notification:get-settings"),
-		updateSettings: (settings: import("../shared/types").NotificationSettings) =>
-			ipcRenderer.invoke("notification:update-settings", settings),
+		updateSettings: (
+			settings: import("../shared/types").NotificationSettings,
+		) => ipcRenderer.invoke("notification:update-settings", settings),
 		getPort: () => ipcRenderer.invoke("notification:get-port"),
-		onReceived: (cb: (notification: import("../shared/types").ConnexioNotification) => void) => {
-			const listener = (_e: IpcRendererEvent, notification: import("../shared/types").ConnexioNotification) =>
-				cb(notification);
+		onReceived: (
+			cb: (
+				notification: import("../shared/types").ConnexioNotification,
+			) => void,
+		) => {
+			const listener = (
+				_e: IpcRendererEvent,
+				notification: import("../shared/types").ConnexioNotification,
+			) => cb(notification);
 			ipcRenderer.on("notification:received", listener);
-			return () => ipcRenderer.removeListener("notification:received", listener);
+			return () =>
+				ipcRenderer.removeListener("notification:received", listener);
 		},
+		getProviders: () => ipcRenderer.invoke("notification:get-providers"),
+		installHook: (providerId: string) =>
+			ipcRenderer.invoke("notification:install-hook", providerId),
+		uninstallHook: (providerId: string) =>
+			ipcRenderer.invoke("notification:uninstall-hook", providerId),
 	},
 });

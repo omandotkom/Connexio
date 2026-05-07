@@ -173,6 +173,13 @@ export interface NotificationSettings {
 	idleThreshold: number; // seconds, for generic idle detection
 }
 
+export interface AIProvider {
+	id: string;
+	name: string;
+	isInstalled: boolean;
+	isHookInstalled: boolean;
+}
+
 // IPC Channel names
 export const IPC = {
 	TERMINAL_CREATE: "terminal:create",

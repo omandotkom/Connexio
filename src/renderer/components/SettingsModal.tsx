@@ -1,4 +1,5 @@
 import {
+	Bell,
 	CheckCircle2,
 	Download,
 	Loader2,
@@ -12,8 +13,9 @@ import { useEffect, useState } from "react";
 import type { AppSettings } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
+import AIIntegrationsSettings from "./AIIntegrationsSettings";
 
-type SettingsTab = "general" | "terminal" | "appearance" | "about";
+type SettingsTab = "general" | "terminal" | "appearance" | "notifications" | "about";
 
 const MIN_SCROLLBACK = 500;
 const MAX_SCROLLBACK = 2000;
@@ -92,6 +94,7 @@ export default function SettingsModal() {
 		{ id: "general", label: "General", icon: <Monitor size={14} /> },
 		{ id: "terminal", label: "Terminal", icon: <Terminal size={14} /> },
 		{ id: "appearance", label: "Appearance", icon: <Palette size={14} /> },
+		{ id: "notifications", label: "Notifications", icon: <Bell size={14} /> },
 		{ id: "about", label: "About", icon: <Rocket size={14} /> },
 	];
 
@@ -152,6 +155,7 @@ export default function SettingsModal() {
 								onThemeChange={setTheme}
 							/>
 						)}
+						{activeTab === "notifications" && <NotificationsSettings />}
 						{activeTab === "about" && <AboutSettings />}
 					</div>
 				</div>
@@ -633,6 +637,15 @@ function AboutSettings() {
 					Made with ♥ by Connexio Team
 				</p>
 			</div>
+		</div>
+	);
+}
+
+// === Notifications Settings ===
+function NotificationsSettings() {
+	return (
+		<div className="space-y-5">
+			<AIIntegrationsSettings />
 		</div>
 	);
 }

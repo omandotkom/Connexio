@@ -15,8 +15,11 @@ export default function App() {
 	const { loadProjects, activeProjectId, restoreWorkspace } = useProjectStore();
 	const { loadTheme, loadThemes } = useThemeStore();
 	const { isSettingsOpen, loadSettings, loadShells } = useSettingsStore();
-	const { loadNotifications, loadSettings: loadNotifSettings, handleIncoming } =
-		useNotificationStore();
+	const {
+		loadNotifications,
+		loadSettings: loadNotifSettings,
+		handleIncoming,
+	} = useNotificationStore();
 
 	useEffect(() => {
 		const init = async () => {

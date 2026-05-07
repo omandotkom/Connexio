@@ -122,14 +122,27 @@ interface ConnexioAPI {
 		markAllRead: () => Promise<void>;
 		remove: (id: string) => Promise<void>;
 		clear: () => Promise<void>;
-		getSettings: () => Promise<import("../../shared/types").NotificationSettings>;
+		getSettings: () => Promise<
+			import("../../shared/types").NotificationSettings
+		>;
 		updateSettings: (
 			settings: import("../../shared/types").NotificationSettings,
 		) => Promise<import("../../shared/types").NotificationSettings>;
 		getPort: () => Promise<number | null>;
 		onReceived: (
-			cb: (notification: import("../../shared/types").ConnexioNotification) => void,
+			cb: (
+				notification: import("../../shared/types").ConnexioNotification,
+			) => void,
 		) => () => void;
+		getProviders: () => Promise<
+			import("../../shared/types").AIProvider[]
+		>;
+		installHook: (
+			providerId: string,
+		) => Promise<{ success: boolean; error?: string }>;
+		uninstallHook: (
+			providerId: string,
+		) => Promise<{ success: boolean; error?: string }>;
 	};
 }
 

@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from "electron";
 import fs from "fs";
 import * as pty from "node-pty";
 import os from "os";
+import { getNotificationServerPort } from "./notification-server";
 
 interface TerminalEntry {
 	process: pty.IPty;
@@ -65,6 +66,12 @@ export function setupTerminalIPC() {
 				// Ensure LANG is set for proper Unicode rendering
 				if (!env.LANG) {
 					env.LANG = "en_US.UTF-8";
+				}
+
+				// Inject notification server port so AI agent hooks can connect
+				const notifPort = getNotificationServerPort();
+				if (notifPort) {
+					env.CONNEXIO_NOTIFICATION_PORT = String(notifPort);
 				}
 
 				const ptyProcess = pty.spawn(shellPath, [], {

@@ -44,7 +44,9 @@ export function startNotificationServer(): void {
 		const addr = server?.address();
 		if (addr && typeof addr === "object") {
 			serverPort = addr.port;
-			console.log(`[Connexio] Notification server listening on port ${serverPort}`);
+			console.log(
+				`[Connexio] Notification server listening on port ${serverPort}`,
+			);
 		}
 	});
 
@@ -97,7 +99,8 @@ function processMessage(raw: string): void {
 		store.add(notification);
 
 		// Send to renderer
-		const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+		const win =
+			BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
 		if (win && !win.isDestroyed()) {
 			win.webContents.send("notification:received", notification);
 		}
