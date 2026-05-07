@@ -39,6 +39,7 @@ app.commandLine.appendSwitch(
 // In dev, use a separate userData folder so it doesn't conflict with the
 // installed/production Connexio app, while still preventing duplicate dev apps.
 const isDev = !app.isPackaged;
+app.setName("Connexio");
 if (isDev) {
 	app.setPath("userData", path.join(app.getPath("appData"), "connexio-dev"));
 }
@@ -63,6 +64,7 @@ function createWindow() {
 		minWidth: 800,
 		minHeight: 600,
 		frame: false,
+		title: "Connexio",
 		titleBarStyle: "hidden",
 		icon: iconPath,
 		webPreferences: {

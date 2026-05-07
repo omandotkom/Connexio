@@ -171,6 +171,7 @@ function showNativeNotification(notification: ConnexioNotification): void {
 
 	const nativeNotification = new Notification({
 		title,
+		subtitle: "Connexio",
 		body: notification.body,
 		silent: true, // sound handled by renderer custom sound
 	});
