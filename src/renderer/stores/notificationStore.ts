@@ -113,12 +113,13 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 
 		// Play sound if enabled
 		if (settings?.sound) {
-			// Use system notification sound via Audio API
 			try {
-				const audio = new Audio();
-				audio.src =
-					"data:audio/wav;base64,UklGRl9vT19teleXRhdmVmbXQgEAAAAAEAAQBEFwAAiB4AAAIAEAAAAGRYYXQAAAA=";
-				audio.volume = 0.3;
+				const soundUrl = new URL(
+					"../../assets/sounds/notification.wav",
+					import.meta.url,
+				).href;
+				const audio = new Audio(soundUrl);
+				audio.volume = settings.soundVolume ?? 0.5;
 				audio.play().catch(() => {});
 			} catch {
 				// Ignore audio errors

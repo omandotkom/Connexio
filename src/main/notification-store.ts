@@ -16,6 +16,7 @@ const store = new Store<{
 		notificationSettings: {
 			enabled: true,
 			sound: true,
+			soundVolume: 0.5,
 			showWhenFocused: false,
 			idleThreshold: 5,
 		},
@@ -74,6 +75,7 @@ class NotificationStore {
 		return store.get("notificationSettings", {
 			enabled: true,
 			sound: true,
+			soundVolume: 0.5,
 			showWhenFocused: false,
 			idleThreshold: 5,
 		});

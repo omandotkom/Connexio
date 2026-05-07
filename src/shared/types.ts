@@ -169,6 +169,7 @@ export interface ConnexioNotification {
 export interface NotificationSettings {
 	enabled: boolean;
 	sound: boolean;
+	soundVolume: number; // 0.0 - 1.0
 	showWhenFocused: boolean;
 	idleThreshold: number; // seconds, for generic idle detection
 }
