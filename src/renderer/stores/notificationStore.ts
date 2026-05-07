@@ -115,7 +115,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
 		if (settings?.sound) {
 			try {
 				const soundUrl = new URL(
-					"../../assets/sounds/notification.wav",
+					"../assets/notification.wav",
 					import.meta.url,
 				).href;
 				const audio = new Audio(soundUrl);
