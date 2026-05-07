@@ -42,8 +42,6 @@ export default function App() {
 		return unsubscribe;
 	}, [handleIncoming]);
 
-
-
 	return (
 		<div className="flex flex-col h-screen w-screen bg-connexio-bg">
 			<TitleBar />

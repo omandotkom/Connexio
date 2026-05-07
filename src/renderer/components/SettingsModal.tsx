@@ -696,8 +696,6 @@ function NotificationsSettings() {
 		}
 	};
 
-
-
 	return (
 		<div className="space-y-5">
 			{/* Sound Settings */}
