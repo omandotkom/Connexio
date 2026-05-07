@@ -6,7 +6,7 @@ import TitleBar from "./components/TitleBar";
 import UpdateNotification from "./components/UpdateNotification";
 import WelcomeScreen from "./components/WelcomeScreen";
 import Workspace from "./components/Workspace";
-import { useTerminalIdleNotify } from "./hooks/useTerminalIdleNotify";
+
 import { useNotificationStore } from "./stores/notificationStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -42,8 +42,7 @@ export default function App() {
 		return unsubscribe;
 	}, [handleIncoming]);
 
-	// Terminal idle detection
-	useTerminalIdleNotify();
+
 
 	return (
 		<div className="flex flex-col h-screen w-screen bg-connexio-bg">

@@ -696,17 +696,7 @@ function NotificationsSettings() {
 		}
 	};
 
-	const handleIdleToggle = (value: boolean) => {
-		if (settings) {
-			updateSettings({ ...settings, idleNotify: value });
-		}
-	};
 
-	const handleIdleThresholdChange = (value: number) => {
-		if (settings) {
-			updateSettings({ ...settings, idleThreshold: value });
-		}
-	};
 
 	return (
 		<div className="space-y-5">
@@ -793,55 +783,6 @@ function NotificationsSettings() {
 								</button>
 							)}
 						</div>
-					</div>
-				)}
-			</div>
-
-			{/* Terminal Idle Notification */}
-			<div className="space-y-4">
-				<h3 className="text-xs font-semibold text-connexio-text-secondary uppercase tracking-wider">
-					Terminal Idle
-				</h3>
-
-				<div className="flex items-center justify-between">
-					<div>
-						<label className="block text-xs font-medium text-connexio-text-secondary">
-							Notify on Idle
-						</label>
-						<p className="text-[10px] text-connexio-text-muted mt-0.5">
-							Get notified when a watched terminal goes idle (e.g. npm install
-							finishes)
-						</p>
-					</div>
-					<ToggleSwitch
-						checked={settings?.idleNotify ?? false}
-						onChange={handleIdleToggle}
-					/>
-				</div>
-
-				{settings?.idleNotify && (
-					<div>
-						<label className="block text-xs font-medium text-connexio-text-secondary mb-1.5">
-							Idle Threshold
-						</label>
-						<div className="flex items-center gap-3">
-							<input
-								type="range"
-								min={3}
-								max={30}
-								value={settings?.idleThreshold ?? 5}
-								onChange={(e) =>
-									handleIdleThresholdChange(Number(e.target.value))
-								}
-								className="flex-1 accent-[var(--accent-color)]"
-							/>
-							<span className="text-xs text-connexio-text w-12 text-right">
-								{settings?.idleThreshold ?? 5}s
-							</span>
-						</div>
-						<p className="text-[10px] text-connexio-text-muted mt-1">
-							Seconds of silence before considering terminal idle
-						</p>
 					</div>
 				)}
 			</div>
