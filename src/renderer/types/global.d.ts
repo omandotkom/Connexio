@@ -90,6 +90,24 @@ interface ConnexioAPI {
 		status: (
 			projectPath: string,
 		) => Promise<import("../../shared/types").GitStatus>;
+		changedFiles: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitChangedFile[]>;
+		diff: (
+			projectPath: string,
+			filePath: string,
+			staged: boolean,
+		) => Promise<import("../../shared/types").GitDiffResult>;
+		diffUntracked: (
+			projectPath: string,
+			filePath: string,
+		) => Promise<import("../../shared/types").GitDiffResult>;
+		stage: (projectPath: string, filePath: string) => Promise<boolean>;
+		stageAll: (projectPath: string) => Promise<boolean>;
+		unstage: (projectPath: string, filePath: string) => Promise<boolean>;
+		unstageAll: (projectPath: string) => Promise<boolean>;
+		discard: (projectPath: string, filePath: string) => Promise<boolean>;
+		openFile: (projectPath: string, filePath: string) => Promise<boolean>;
 	};
 	updater: {
 		check: () => Promise<string | null>;

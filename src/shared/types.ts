@@ -151,6 +151,38 @@ export interface GitStatus {
 	remoteUrl: string;
 }
 
+// Source Control
+export type GitFileStatus = "M" | "A" | "D" | "R" | "C" | "U" | "?";
+
+export interface GitChangedFile {
+	path: string;
+	oldPath?: string; // for renames
+	indexStatus: GitFileStatus | " ";
+	workTreeStatus: GitFileStatus | " ";
+}
+
+export interface GitDiffResult {
+	file: string;
+	hunks: GitDiffHunk[];
+	isBinary?: boolean;
+	isTooLarge?: boolean;
+	fileSize?: number;
+	truncated?: boolean;
+	language?: string; // for syntax highlighting hint
+}
+
+export interface GitDiffHunk {
+	header: string;
+	lines: GitDiffLine[];
+}
+
+export interface GitDiffLine {
+	type: "add" | "remove" | "context";
+	content: string;
+	oldLineNo?: number;
+	newLineNo?: number;
+}
+
 // Notifications
 export type NotificationSource = "agent" | "command" | "system";
 

@@ -5,7 +5,7 @@ import {
 	GitBranch,
 	GitCommit,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitStatus } from "../../shared/types";
 
 interface Props {
@@ -15,33 +15,62 @@ interface Props {
 export default function GitStatusBar({ projectPath }: Props) {
 	const [status, setStatus] = useState<GitStatus | null>(null);
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const mountedRef = useRef(false);
+	const activeProjectPathRef = useRef(projectPath);
 
-	const fetchStatus = async () => {
+	const fetchStatus = useCallback(async () => {
+		const targetPath = projectPath;
 		try {
-			const result = await window.connexio.git.status(projectPath);
-			setStatus(result);
+			const result = await window.connexio.git.status(targetPath);
+			if (mountedRef.current && activeProjectPathRef.current === targetPath) {
+				setStatus(result);
+			}
 		} catch {
-			setStatus(null);
+			if (mountedRef.current && activeProjectPathRef.current === targetPath) {
+				setStatus(null);
+			}
 		}
-	};
+	}, [projectPath]);
 
 	useEffect(() => {
+		mountedRef.current = true;
+		activeProjectPathRef.current = projectPath;
+		setStatus(null);
 		fetchStatus();
 
-		// Poll every 60 seconds to reduce background git work
-		intervalRef.current = setInterval(fetchStatus, 60000);
+		const startPolling = () => {
+			if (intervalRef.current) return;
+			intervalRef.current = setInterval(fetchStatus, 60000);
+		};
+		const stopPolling = () => {
+			if (intervalRef.current) {
+				clearInterval(intervalRef.current);
+				intervalRef.current = null;
+			}
+		};
 
-		// Also refresh when window regains focus
+		startPolling();
+
+		const onVisibilityChange = () => {
+			if (document.hidden) {
+				stopPolling();
+			} else {
+				fetchStatus();
+				startPolling();
+			}
+		};
 		const onFocus = () => fetchStatus();
+
+		document.addEventListener("visibilitychange", onVisibilityChange);
 		window.addEventListener("focus", onFocus);
 
 		return () => {
-			if (intervalRef.current) {
-				clearInterval(intervalRef.current);
-			}
+			mountedRef.current = false;
+			stopPolling();
+			document.removeEventListener("visibilitychange", onVisibilityChange);
 			window.removeEventListener("focus", onFocus);
 		};
-	}, [projectPath]);
+	}, [projectPath, fetchStatus]);
 
 	if (!status || !status.isRepo) return null;
 
@@ -49,7 +78,7 @@ export default function GitStatusBar({ projectPath }: Props) {
 		status.modified + status.staged + status.untracked + status.conflicted > 0;
 
 	return (
-		<div className="flex items-center gap-2 ml-auto">
+		<div className="flex items-center gap-2 flex-wrap">
 			{/* Branch */}
 			<div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-connexio-bg-tertiary">
 				<GitBranch size={10} className="text-connexio-accent" />

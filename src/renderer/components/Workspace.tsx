@@ -1,16 +1,16 @@
-import { ListTodo, PanelRightClose, Server } from "lucide-react";
-import { useRef, useState } from "react";
+import { GitBranch, ListTodo, PanelRightClose, Server } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
-import GitStatusBar from "./GitStatusBar";
 import ShellPicker from "./ShellPicker";
+import SourcePanel from "./SourcePanel";
 import SSHPanel from "./SSHPanel";
 import TaskPanel from "./TaskPanel";
 import TerminalLayer from "./TerminalLayer";
 import WorkspaceTab from "./WorkspaceTab";
 
-type SidePanelTab = "tasks" | "ssh";
+type SidePanelTab = "tasks" | "ssh" | "source";
 
 export default function Workspace() {
 	const {
@@ -35,6 +35,43 @@ export default function Workspace() {
 		null,
 	);
 	const tabBarRef = useRef<HTMLDivElement>(null);
+
+	// Resizable side panel
+	const [panelWidth, setPanelWidth] = useState(360);
+	const isResizing = useRef(false);
+	const panelRef = useRef<HTMLDivElement>(null);
+
+	const handleResizeStart = useCallback((e: React.MouseEvent) => {
+		e.preventDefault();
+		isResizing.current = true;
+		document.body.style.cursor = "col-resize";
+		document.body.style.userSelect = "none";
+	}, []);
+
+	useEffect(() => {
+		const handleResizeMove = (e: MouseEvent) => {
+			if (!isResizing.current || !panelRef.current) return;
+			const containerRect = panelRef.current.parentElement?.getBoundingClientRect();
+			if (!containerRect) return;
+			const newWidth = containerRect.right - e.clientX;
+			setPanelWidth(Math.max(280, Math.min(600, newWidth)));
+		};
+
+		const handleResizeEnd = () => {
+			if (isResizing.current) {
+				isResizing.current = false;
+				document.body.style.cursor = "";
+				document.body.style.userSelect = "";
+			}
+		};
+
+		document.addEventListener("mousemove", handleResizeMove);
+		document.addEventListener("mouseup", handleResizeEnd);
+		return () => {
+			document.removeEventListener("mousemove", handleResizeMove);
+			document.removeEventListener("mouseup", handleResizeEnd);
+		};
+	}, []);
 
 	if (!activeProjectId) return null;
 
@@ -138,7 +175,6 @@ export default function Workspace() {
 				<span className="text-[10px] text-connexio-text-muted truncate opacity-60 flex-shrink min-w-0">
 					{project.path}
 				</span>
-				<GitStatusBar projectPath={project.path} />
 
 				{/* Command Timer for active terminal */}
 				{activeTab?.terminalId && (
@@ -147,6 +183,18 @@ export default function Workspace() {
 
 				{/* Side panel toggles */}
 				<div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
+					<button
+						onClick={() => toggleSidePanel("source")}
+						className={`p-1 rounded transition-colors ${
+							showSidePanel && sidePanelTab === "source"
+								? "bg-connexio-accent/10 text-connexio-accent"
+								: "hover:bg-connexio-bg-tertiary text-connexio-text-muted"
+						}`}
+						title="Source Control"
+						type="button"
+					>
+						<GitBranch size={12} />
+					</button>
 					<button
 						onClick={() => toggleSidePanel("tasks")}
 						className={`p-1 rounded transition-colors ${
@@ -223,9 +271,32 @@ export default function Workspace() {
 
 				{/* Right Side Panel */}
 				{showSidePanel && (
-					<div className="w-60 bg-connexio-bg-secondary border-l border-connexio-border flex flex-col">
+					<div
+						ref={panelRef}
+						className="bg-connexio-bg-secondary border-l border-connexio-border flex flex-col relative"
+						style={{ width: sidePanelTab === "source" ? panelWidth : 240 }}
+					>
+						{/* Resize handle (only for source panel) */}
+						{sidePanelTab === "source" && (
+							<div
+								className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-connexio-accent/30 active:bg-connexio-accent/50 transition-colors z-10"
+								onMouseDown={handleResizeStart}
+							/>
+						)}
 						{/* Panel header with tabs */}
 						<div className="flex items-center border-b border-connexio-border">
+							<button
+								onClick={() => setSidePanelTab("source")}
+								className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+									sidePanelTab === "source"
+										? "text-connexio-accent border-b-2 border-connexio-accent"
+										: "text-connexio-text-muted hover:text-connexio-text-secondary"
+								}`}
+								type="button"
+							>
+								<GitBranch size={10} />
+								Source
+							</button>
 							<button
 								onClick={() => setSidePanelTab("tasks")}
 								className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
@@ -263,6 +334,9 @@ export default function Workspace() {
 						</div>
 
 						{/* Panel content */}
+						{sidePanelTab === "source" && (
+							<SourcePanel projectPath={project.path} />
+						)}
 						{sidePanelTab === "tasks" && (
 							<TaskPanel
 								projectId={activeProjectId}

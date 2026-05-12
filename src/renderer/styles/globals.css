@@ -2,6 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Syntax highlighting — custom theme aligned with Connexio dark palette */
+.hljs-line .hljs-comment,
+.hljs-line .hljs-quote {
+	color: #6b7280;
+	font-style: italic;
+}
+.hljs-line .hljs-keyword,
+.hljs-line .hljs-selector-tag,
+.hljs-line .hljs-meta-keyword {
+	color: #c084fc;
+}
+.hljs-line .hljs-string,
+.hljs-line .hljs-regexp,
+.hljs-line .hljs-template-tag,
+.hljs-line .hljs-template-variable {
+	color: #86efac;
+}
+.hljs-line .hljs-number,
+.hljs-line .hljs-literal {
+	color: #fbbf24;
+}
+.hljs-line .hljs-title,
+.hljs-line .hljs-title.function_,
+.hljs-line .hljs-name,
+.hljs-line .hljs-section {
+	color: #60a5fa;
+}
+.hljs-line .hljs-attr,
+.hljs-line .hljs-attribute,
+.hljs-line .hljs-variable,
+.hljs-line .hljs-property {
+	color: #93c5fd;
+}
+.hljs-line .hljs-type,
+.hljs-line .hljs-built_in,
+.hljs-line .hljs-builtin-name,
+.hljs-line .hljs-class .hljs-title {
+	color: #fdba74;
+}
+.hljs-line .hljs-params,
+.hljs-line .hljs-symbol {
+	color: #f472b6;
+}
+.hljs-line .hljs-tag,
+.hljs-line .hljs-selector-attr,
+.hljs-line .hljs-selector-class,
+.hljs-line .hljs-selector-id,
+.hljs-line .hljs-selector-pseudo {
+	color: #f87171;
+}
+.hljs-line .hljs-doctag,
+.hljs-line .hljs-meta {
+	color: #9ca3af;
+}
+.hljs-line .hljs-deletion {
+	color: #fca5a5;
+}
+.hljs-line .hljs-addition {
+	color: #86efac;
+}
+.hljs-line .hljs-emphasis {
+	font-style: italic;
+}
+.hljs-line .hljs-strong {
+	font-weight: 600;
+}
+
+
 :root {
 	--bg-primary: #0f1117;
 	--bg-secondary: #161822;
@@ -117,3 +185,14 @@ body {
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 }
+
+/* Modal fade-in */
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+

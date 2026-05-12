@@ -100,6 +100,24 @@ contextBridge.exposeInMainWorld("connexio", {
 	git: {
 		status: (projectPath: string) =>
 			ipcRenderer.invoke("git:status", projectPath),
+		changedFiles: (projectPath: string) =>
+			ipcRenderer.invoke("git:changed-files", projectPath),
+		diff: (projectPath: string, filePath: string, staged: boolean) =>
+			ipcRenderer.invoke("git:diff", projectPath, filePath, staged),
+		diffUntracked: (projectPath: string, filePath: string) =>
+			ipcRenderer.invoke("git:diff-untracked", projectPath, filePath),
+		stage: (projectPath: string, filePath: string) =>
+			ipcRenderer.invoke("git:stage", projectPath, filePath),
+		stageAll: (projectPath: string) =>
+			ipcRenderer.invoke("git:stage-all", projectPath),
+		unstage: (projectPath: string, filePath: string) =>
+			ipcRenderer.invoke("git:unstage", projectPath, filePath),
+		unstageAll: (projectPath: string) =>
+			ipcRenderer.invoke("git:unstage-all", projectPath),
+		discard: (projectPath: string, filePath: string) =>
+			ipcRenderer.invoke("git:discard", projectPath, filePath),
+		openFile: (projectPath: string, filePath: string) =>
+			ipcRenderer.invoke("git:open-file", projectPath, filePath),
 	},
 
 	updater: {
