@@ -1,4 +1,6 @@
 import {
+	AlertCircle,
+	Check,
 	ChevronDown,
 	ChevronRight,
 	FileCode,
@@ -6,12 +8,15 @@ import {
 	FilePlus,
 	FileQuestion,
 	FileWarning,
+	Loader2,
 	Maximize2,
 	Minus,
 	Plus,
 	RefreshCw,
 	RotateCcw,
+	Search,
 	Undo2,
+	X,
 } from "lucide-react";
 import {
 	memo,
@@ -176,6 +181,52 @@ function getFileDir(filePath: string): string {
 }
 
 // ============================================
+// Source Message (inline feedback)
+// ============================================
+
+interface SourceMessage {
+	type: "success" | "error" | "info";
+	text: string;
+}
+
+const MESSAGE_AUTO_HIDE_MS = 4000;
+
+// ============================================
+// Filter helper
+// ============================================
+
+function filterFiles(
+	files: GitChangedFile[],
+	query: string,
+	group: FileGroup,
+): GitChangedFile[] {
+	const q = query.trim().toLowerCase();
+	if (!q) return files;
+
+	return files.filter((file) => {
+		const filePath = file.path.toLowerCase();
+		const fileName = getFileName(file.path).toLowerCase();
+		const status = group === "staged" ? file.indexStatus : file.workTreeStatus;
+
+		// Match status shorthand: "M", "A", "D", "?"
+		if (q.length === 1 && status.toLowerCase() === q) return true;
+
+		// Match group prefix: "staged", "modified", "untracked"
+		if (q.startsWith("group:")) {
+			return group === q.slice(6);
+		}
+
+		// Match status prefix: "status:M"
+		if (q.startsWith("status:")) {
+			return status.toLowerCase() === q.slice(7);
+		}
+
+		// Default: match file path or name
+		return filePath.includes(q) || fileName.includes(q);
+	});
+}
+
+// ============================================
 // Changed File Item (memoized)
 // ============================================
 
@@ -187,6 +238,7 @@ interface FileItemProps {
 	onToggle: () => void;
 	onRefresh: () => void;
 	onMaximize: () => void;
+	onMessage: (msg: SourceMessage) => void;
 }
 
 const ChangedFileItem = memo(function ChangedFileItem({
@@ -197,6 +249,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
 	onToggle,
 	onRefresh,
 	onMaximize,
+	onMessage,
 }: FileItemProps) {
 	const key = cacheKey(projectPath, group, file.path);
 	const [diff, setDiff] = useState<GitDiffResult | null>(
@@ -204,6 +257,7 @@ const ChangedFileItem = memo(function ChangedFileItem({
 	);
 	const [loading, setLoading] = useState(false);
 	const [discardConfirm, setDiscardConfirm] = useState(false);
+	const [actionLoading, setActionLoading] = useState(false);
 
 	const status = group === "staged" ? file.indexStatus : file.workTreeStatus;
 	const isDeleted = status === "D";
@@ -252,20 +306,41 @@ const ChangedFileItem = memo(function ChangedFileItem({
 
 	const handleStage = async (e: React.MouseEvent) => {
 		e.stopPropagation();
-		await window.connexio.git.stage(projectPath, file.path);
-		onRefresh();
+		if (actionLoading) return;
+		setActionLoading(true);
+		try {
+			await window.connexio.git.stage(projectPath, file.path);
+			onRefresh();
+		} catch {
+			onMessage({ type: "error", text: `Failed to stage ${getFileName(file.path)}` });
+		}
+		setActionLoading(false);
 	};
 
 	const handleUnstage = async (e: React.MouseEvent) => {
 		e.stopPropagation();
-		await window.connexio.git.unstage(projectPath, file.path);
-		onRefresh();
+		if (actionLoading) return;
+		setActionLoading(true);
+		try {
+			await window.connexio.git.unstage(projectPath, file.path);
+			onRefresh();
+		} catch {
+			onMessage({ type: "error", text: `Failed to unstage ${getFileName(file.path)}` });
+		}
+		setActionLoading(false);
 	};
 
 	const handleDiscard = async () => {
-		await window.connexio.git.discard(projectPath, file.path);
-		setDiscardConfirm(false);
-		onRefresh();
+		setActionLoading(true);
+		try {
+			await window.connexio.git.discard(projectPath, file.path);
+			setDiscardConfirm(false);
+			onRefresh();
+		} catch {
+			onMessage({ type: "error", text: `Failed to discard ${getFileName(file.path)}` });
+			setDiscardConfirm(false);
+		}
+		setActionLoading(false);
 	};
 
 	return (
@@ -321,47 +396,53 @@ const ChangedFileItem = memo(function ChangedFileItem({
 				</span>
 
 				<div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-					<button
-						onClick={(e) => {
-							e.stopPropagation();
-							onMaximize();
-						}}
-						className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
-						title="Open full-screen diff viewer"
-						type="button"
-					>
-						<Maximize2 size={10} className="text-connexio-accent" />
-					</button>
-					{group === "staged" ? (
-						<button
-							onClick={handleUnstage}
-							className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
-							title="Unstage"
-							type="button"
-						>
-							<Minus size={10} className="text-yellow-400" />
-						</button>
+					{actionLoading ? (
+						<Loader2 size={10} className="text-connexio-text-muted animate-spin" />
 					) : (
 						<>
 							<button
-								onClick={handleStage}
-								className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
-								title="Stage"
-								type="button"
-							>
-								<Plus size={10} className="text-green-400" />
-							</button>
-							<button
 								onClick={(e) => {
 									e.stopPropagation();
-									setDiscardConfirm(true);
+									onMaximize();
 								}}
 								className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
-								title="Discard changes"
+								title="Open full-screen diff viewer"
 								type="button"
 							>
-								<Undo2 size={10} className="text-red-400" />
+								<Maximize2 size={10} className="text-connexio-accent" />
 							</button>
+							{group === "staged" ? (
+								<button
+									onClick={handleUnstage}
+									className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
+									title="Unstage"
+									type="button"
+								>
+									<Minus size={10} className="text-yellow-400" />
+								</button>
+							) : (
+								<>
+									<button
+										onClick={handleStage}
+										className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
+										title="Stage"
+										type="button"
+									>
+										<Plus size={10} className="text-green-400" />
+									</button>
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											setDiscardConfirm(true);
+										}}
+										className="p-0.5 rounded hover:bg-connexio-bg-primary transition-colors"
+										title="Discard changes"
+										type="button"
+									>
+										<Undo2 size={10} className="text-red-400" />
+									</button>
+								</>
+							)}
 						</>
 					)}
 				</div>
@@ -466,13 +547,32 @@ export default function SourcePanel({ projectPath }: Props) {
 	});
 	const [modalOpen, setModalOpen] = useState(false);
 	const [modalInitialIndex, setModalInitialIndex] = useState(0);
+	const [filterQuery, setFilterQuery] = useState("");
+	const [showFilter, setShowFilter] = useState(false);
+	const [message, setMessage] = useState<SourceMessage | null>(null);
+	const [globalActionLoading, setGlobalActionLoading] = useState<string | null>(null);
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const mountedRef = useRef(true);
 	const activeProjectPathRef = useRef(projectPath);
+	const filterInputRef = useRef<HTMLInputElement>(null);
+	const messageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
 		activeProjectPathRef.current = projectPath;
 	}, [projectPath]);
+
+	const showMessage = useCallback((msg: SourceMessage) => {
+		setMessage(msg);
+		if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+		messageTimerRef.current = setTimeout(() => {
+			setMessage(null);
+		}, MESSAGE_AUTO_HIDE_MS);
+	}, []);
+
+	const dismissMessage = useCallback(() => {
+		setMessage(null);
+		if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
+	}, []);
 
 	const fetchFiles = useCallback(
 		async (opts?: { silent?: boolean; force?: boolean }) => {
@@ -528,6 +628,9 @@ export default function SourcePanel({ projectPath }: Props) {
 			untracked: INITIAL_VISIBLE_FILES_PER_GROUP,
 		});
 		setModalOpen(false);
+		setFilterQuery("");
+		setMessage(null);
+		setGlobalActionLoading(null);
 		trimDiffCache(projectPath);
 
 		// Seed from cache immediately
@@ -580,19 +683,32 @@ export default function SourcePanel({ projectPath }: Props) {
 	}, [fetchFiles, projectPath]);
 
 	const grouped = useMemo(() => groupFiles(files), [files]);
+
+	// Apply filter to each group
+	const filteredGrouped = useMemo(() => {
+		if (!filterQuery.trim()) return grouped;
+		return {
+			staged: filterFiles(grouped.staged, filterQuery, "staged"),
+			modified: filterFiles(grouped.modified, filterQuery, "modified"),
+			untracked: filterFiles(grouped.untracked, filterQuery, "untracked"),
+		};
+	}, [grouped, filterQuery]);
+
 	const totalChanges =
 		grouped.staged.length + grouped.modified.length + grouped.untracked.length;
+	const filteredTotal =
+		filteredGrouped.staged.length + filteredGrouped.modified.length + filteredGrouped.untracked.length;
 
 	const modalFiles = useMemo<DiffFileContext[]>(() => {
 		return [
-			...grouped.staged.map((f) => ({ file: f, group: "staged" as const })),
-			...grouped.modified.map((f) => ({ file: f, group: "modified" as const })),
-			...grouped.untracked.map((f) => ({
+			...filteredGrouped.staged.map((f) => ({ file: f, group: "staged" as const })),
+			...filteredGrouped.modified.map((f) => ({ file: f, group: "modified" as const })),
+			...filteredGrouped.untracked.map((f) => ({
 				file: f,
 				group: "untracked" as const,
 			})),
 		];
-	}, [grouped.staged, grouped.modified, grouped.untracked]);
+	}, [filteredGrouped.staged, filteredGrouped.modified, filteredGrouped.untracked]);
 
 	const toggleFile = useCallback((key: string) => {
 		setExpandedFiles((prev) => {
@@ -637,16 +753,32 @@ export default function SourcePanel({ projectPath }: Props) {
 	}, [fetchFiles, projectPath]);
 
 	const handleStageAll = useCallback(async () => {
-		await window.connexio.git.stageAll(projectPath);
-		invalidateDiffCache(projectPath);
-		fetchFiles({ force: true });
-	}, [fetchFiles, projectPath]);
+		if (globalActionLoading) return;
+		setGlobalActionLoading("stage-all");
+		try {
+			await window.connexio.git.stageAll(projectPath);
+			invalidateDiffCache(projectPath);
+			await fetchFiles({ force: true });
+			showMessage({ type: "success", text: "All changes staged" });
+		} catch {
+			showMessage({ type: "error", text: "Failed to stage all changes" });
+		}
+		setGlobalActionLoading(null);
+	}, [fetchFiles, projectPath, globalActionLoading, showMessage]);
 
 	const handleUnstageAll = useCallback(async () => {
-		await window.connexio.git.unstageAll(projectPath);
-		invalidateDiffCache(projectPath);
-		fetchFiles({ force: true });
-	}, [fetchFiles, projectPath]);
+		if (globalActionLoading) return;
+		setGlobalActionLoading("unstage-all");
+		try {
+			await window.connexio.git.unstageAll(projectPath);
+			invalidateDiffCache(projectPath);
+			await fetchFiles({ force: true });
+			showMessage({ type: "success", text: "All changes unstaged" });
+		} catch {
+			showMessage({ type: "error", text: "Failed to unstage all changes" });
+		}
+		setGlobalActionLoading(null);
+	}, [fetchFiles, projectPath, globalActionLoading, showMessage]);
 
 	const openModal = useCallback(
 		(file: GitChangedFile, group: FileGroup) => {
@@ -748,6 +880,7 @@ export default function SourcePanel({ projectPath }: Props) {
 									onToggle={makeToggle(key)}
 									onRefresh={handleRefresh}
 									onMaximize={makeMaximize(file, group)}
+									onMessage={showMessage}
 								/>
 							);
 						})}
@@ -784,6 +917,25 @@ export default function SourcePanel({ projectPath }: Props) {
 						)}
 					</span>
 					<button
+						onClick={() => {
+							setShowFilter(!showFilter);
+							if (!showFilter) {
+								setTimeout(() => filterInputRef.current?.focus(), 0);
+							} else {
+								setFilterQuery("");
+							}
+						}}
+						className={`p-1 rounded transition-colors ${
+							showFilter
+								? "bg-connexio-accent/10 text-connexio-accent"
+								: "hover:bg-connexio-bg-tertiary text-connexio-text-muted"
+						}`}
+						title="Filter files (Ctrl+F)"
+						type="button"
+					>
+						<Search size={11} />
+					</button>
+					<button
 						onClick={handleRefresh}
 						className="p-1 rounded hover:bg-connexio-bg-tertiary transition-colors"
 						title="Refresh"
@@ -801,8 +953,13 @@ export default function SourcePanel({ projectPath }: Props) {
 							className="p-1 rounded hover:bg-connexio-bg-tertiary transition-colors"
 							title="Stage all changes"
 							type="button"
+							disabled={globalActionLoading === "stage-all"}
 						>
-							<Plus size={11} className="text-green-400" />
+							{globalActionLoading === "stage-all" ? (
+								<Loader2 size={11} className="text-green-400 animate-spin" />
+							) : (
+								<Plus size={11} className="text-green-400" />
+							)}
 						</button>
 					)}
 					{grouped.staged.length > 0 && (
@@ -811,11 +968,79 @@ export default function SourcePanel({ projectPath }: Props) {
 							className="p-1 rounded hover:bg-connexio-bg-tertiary transition-colors"
 							title="Unstage all"
 							type="button"
+							disabled={globalActionLoading === "unstage-all"}
 						>
-							<RotateCcw size={11} className="text-yellow-400" />
+							{globalActionLoading === "unstage-all" ? (
+								<Loader2 size={11} className="text-yellow-400 animate-spin" />
+							) : (
+								<RotateCcw size={11} className="text-yellow-400" />
+							)}
 						</button>
 					)}
 				</div>
+
+				{/* Filter bar */}
+				{showFilter && (
+					<div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-connexio-border bg-connexio-bg-primary">
+						<Search size={10} className="text-connexio-text-muted flex-shrink-0" />
+						<input
+							ref={filterInputRef}
+							type="text"
+							value={filterQuery}
+							onChange={(e) => setFilterQuery(e.target.value)}
+							placeholder="Filter files... (path, name, M/A/D/?)"
+							className="flex-1 bg-transparent text-[11px] text-connexio-text outline-none placeholder:text-connexio-text-muted/60"
+							onKeyDown={(e) => {
+								if (e.key === "Escape") {
+									setShowFilter(false);
+									setFilterQuery("");
+								}
+							}}
+						/>
+						{filterQuery && (
+							<span className="text-[9px] text-connexio-text-muted tabular-nums">
+								{filteredTotal}/{totalChanges}
+							</span>
+						)}
+						<button
+							onClick={() => {
+								setShowFilter(false);
+								setFilterQuery("");
+							}}
+							className="p-0.5 rounded hover:bg-connexio-bg-tertiary transition-colors"
+							type="button"
+						>
+							<X size={10} className="text-connexio-text-muted" />
+						</button>
+					</div>
+				)}
+
+				{/* Inline message */}
+				{message && (
+					<div
+						className={`flex items-center gap-1.5 px-3 py-1.5 border-b border-connexio-border text-[10px] ${
+							message.type === "error"
+								? "bg-red-500/10 text-red-300"
+								: message.type === "success"
+									? "bg-green-500/10 text-green-300"
+									: "bg-blue-500/10 text-blue-300"
+						}`}
+					>
+						{message.type === "error" ? (
+							<AlertCircle size={10} className="flex-shrink-0" />
+						) : message.type === "success" ? (
+							<Check size={10} className="flex-shrink-0" />
+						) : null}
+						<span className="flex-1 truncate">{message.text}</span>
+						<button
+							onClick={dismissMessage}
+							className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+							type="button"
+						>
+							<X size={9} />
+						</button>
+					</div>
+				)}
 
 				<div className="flex-1 overflow-y-auto py-1">
 					{isInitialLoad ? (
@@ -833,11 +1058,21 @@ export default function SourcePanel({ projectPath }: Props) {
 								Working tree is clean
 							</p>
 						</div>
+					) : filteredTotal === 0 && filterQuery ? (
+						<div className="flex flex-col items-center justify-center py-8 px-4">
+							<Search
+								size={20}
+								className="text-connexio-text-muted/30 mb-2"
+							/>
+							<p className="text-[11px] text-connexio-text-muted text-center">
+								No files match "{filterQuery}"
+							</p>
+						</div>
 					) : (
 						<>
-							{renderGroup("staged", "Staged", grouped.staged)}
-							{renderGroup("modified", "Modified", grouped.modified)}
-							{renderGroup("untracked", "Untracked", grouped.untracked)}
+							{renderGroup("staged", "Staged", filteredGrouped.staged)}
+							{renderGroup("modified", "Modified", filteredGrouped.modified)}
+							{renderGroup("untracked", "Untracked", filteredGrouped.untracked)}
 						</>
 					)}
 				</div>
