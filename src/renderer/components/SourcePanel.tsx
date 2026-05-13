@@ -907,7 +907,7 @@ export default function SourcePanel({ projectPath }: Props) {
 			<div className="flex flex-col h-full">
 				{/* Git status bar */}
 				<div className="px-3 py-1.5 border-b border-connexio-border">
-					<GitStatusBar projectPath={projectPath} />
+					<GitStatusBar projectPath={projectPath} onMessage={showMessage} onRefresh={handleRefresh} />
 				</div>
 
 				{/* Tab switcher: Changes / History */}
@@ -951,6 +951,7 @@ export default function SourcePanel({ projectPath }: Props) {
 						<CommitBox
 							projectPath={projectPath}
 							stagedCount={grouped.staged.length}
+							hasUncommittedChanges={totalChanges > 0}
 							onMessage={showMessage}
 							onRefresh={handleRefresh}
 						/>

@@ -199,6 +199,13 @@ export interface GitCommitEntry {
 	subject: string;
 }
 
+// Git branch entry
+export interface GitBranchEntry {
+	name: string;
+	current: boolean;
+	remote: boolean;
+}
+
 // Notifications
 export type NotificationSource = "agent" | "command" | "system";
 

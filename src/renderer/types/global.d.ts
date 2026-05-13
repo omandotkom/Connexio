@@ -115,10 +115,27 @@ interface ConnexioAPI {
 		push: (
 			projectPath: string,
 		) => Promise<import("../../shared/types").GitActionResult>;
+		fetch: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		pull: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
 		history: (
 			projectPath: string,
 			limit?: number,
 		) => Promise<import("../../shared/types").GitCommitEntry[]>;
+		branches: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitBranchEntry[]>;
+		checkout: (
+			projectPath: string,
+			branch: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		createBranch: (
+			projectPath: string,
+			branchName: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
 	};
 	updater: {
 		check: () => Promise<string | null>;

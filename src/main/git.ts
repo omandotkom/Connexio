@@ -861,6 +861,61 @@ async function gitPush(projectPath: string): Promise<GitActionResult> {
 	}
 }
 
+async function gitFetch(projectPath: string): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync("git", ["fetch", "--prune"], {
+			cwd: projectPath,
+			timeout: 60000,
+			windowsHide: true,
+			maxBuffer: 5 * 1024 * 1024,
+		});
+		return {
+			success: true,
+			message: "Fetched successfully",
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Fetch failed";
+		if (errMsg.includes("Authentication") || errMsg.includes("fatal: could not read")) {
+			return { success: false, message: "Authentication failed. Check credentials." };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Fetch failed" };
+	}
+}
+
+async function gitPull(projectPath: string): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync("git", ["pull"], {
+			cwd: projectPath,
+			timeout: 60000,
+			windowsHide: true,
+			maxBuffer: 5 * 1024 * 1024,
+		});
+		const output = stdout || stderr;
+		if (output.includes("Already up to date")) {
+			return { success: true, message: "Already up to date", output };
+		}
+		return { success: true, message: "Pulled successfully", output };
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Pull failed";
+		if (errMsg.includes("CONFLICT") || errMsg.includes("Merge conflict")) {
+			return { success: false, message: "Pull resulted in merge conflicts. Resolve them manually." };
+		}
+		if (errMsg.includes("uncommitted changes") || errMsg.includes("would be overwritten")) {
+			return { success: false, message: "Cannot pull: you have uncommitted changes." };
+		}
+		if (errMsg.includes("no tracking information")) {
+			return { success: false, message: "No upstream branch configured for pull." };
+		}
+		if (errMsg.includes("Authentication") || errMsg.includes("fatal: could not read")) {
+			return { success: false, message: "Authentication failed. Check credentials." };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Pull failed" };
+	}
+}
+
 async function gitHistory(
 	projectPath: string,
 	limit = 50,
@@ -896,6 +951,135 @@ async function gitHistory(
 			.filter((e) => e.shortHash);
 	} catch {
 		return [];
+	}
+}
+
+// ============================================
+// Branch operations
+// ============================================
+
+interface GitBranchEntry {
+	name: string;
+	current: boolean;
+	remote: boolean;
+}
+
+async function gitBranches(projectPath: string): Promise<GitBranchEntry[]> {
+	try {
+		const { stdout } = await execFileAsync(
+			"git",
+			["branch", "-a", "--no-color"],
+			{
+				cwd: projectPath,
+				timeout: 5000,
+				windowsHide: true,
+				maxBuffer: 2 * 1024 * 1024,
+			},
+		);
+		if (!stdout.trim()) return [];
+
+		const branches: GitBranchEntry[] = [];
+		const seen = new Set<string>();
+
+		for (const line of stdout.split("\n")) {
+			const trimmed = line.trim();
+			if (!trimmed) continue;
+
+			const current = trimmed.startsWith("* ");
+			let name = current ? trimmed.slice(2) : trimmed;
+
+			// Skip detached HEAD indicator
+			if (name.startsWith("(HEAD detached")) continue;
+
+			const remote = name.startsWith("remotes/");
+			if (remote) {
+				name = name.replace(/^remotes\//, "");
+				// Skip HEAD pointer
+				if (name.includes("/HEAD")) continue;
+			}
+
+			if (seen.has(name)) continue;
+			seen.add(name);
+
+			branches.push({ name, current, remote });
+		}
+
+		return branches;
+	} catch {
+		return [];
+	}
+}
+
+async function gitCheckout(
+	projectPath: string,
+	branch: string,
+): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["checkout", branch],
+			{
+				cwd: projectPath,
+				timeout: 15000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return {
+			success: true,
+			message: `Switched to branch '${branch}'`,
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Checkout failed";
+		if (errMsg.includes("would be overwritten") || errMsg.includes("uncommitted changes")) {
+			return {
+				success: false,
+				message: "Cannot switch: you have uncommitted changes. Commit or stash them first.",
+			};
+		}
+		if (errMsg.includes("did not match any")) {
+			return { success: false, message: `Branch '${branch}' not found.` };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Checkout failed" };
+	}
+}
+
+async function gitCreateBranch(
+	projectPath: string,
+	branchName: string,
+): Promise<GitActionResult> {
+	if (!branchName.trim()) {
+		return { success: false, message: "Branch name cannot be empty" };
+	}
+	// Validate branch name
+	if (/\s/.test(branchName) || branchName.includes("..") || branchName.startsWith("-")) {
+		return { success: false, message: "Invalid branch name" };
+	}
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["checkout", "-b", branchName.trim()],
+			{
+				cwd: projectPath,
+				timeout: 10000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return {
+			success: true,
+			message: `Created and switched to '${branchName.trim()}'`,
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Create branch failed";
+		if (errMsg.includes("already exists")) {
+			return { success: false, message: `Branch '${branchName}' already exists.` };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Create branch failed" };
 	}
 }
 
@@ -993,10 +1177,44 @@ export function setupGitIPC() {
 		return result;
 	});
 
+	ipcMain.handle("git:fetch", async (_event, projectPath: string) => {
+		const result = await gitFetch(projectPath);
+		if (result.success) invalidateStatusCaches(projectPath);
+		return result;
+	});
+
+	ipcMain.handle("git:pull", async (_event, projectPath: string) => {
+		const result = await gitPull(projectPath);
+		if (result.success) invalidateStatusCaches(projectPath);
+		return result;
+	});
+
 	ipcMain.handle(
 		"git:history",
 		async (_event, projectPath: string, limit?: number) => {
 			return gitHistory(projectPath, limit);
+		},
+	);
+
+	ipcMain.handle("git:branches", async (_event, projectPath: string) => {
+		return gitBranches(projectPath);
+	});
+
+	ipcMain.handle(
+		"git:checkout",
+		async (_event, projectPath: string, branch: string) => {
+			const result = await gitCheckout(projectPath, branch);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		"git:create-branch",
+		async (_event, projectPath: string, branchName: string) => {
+			const result = await gitCreateBranch(projectPath, branchName);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
 		},
 	);
 

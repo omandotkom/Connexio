@@ -2,18 +2,23 @@ import {
 	AlertCircle,
 	ArrowDown,
 	ArrowUp,
+	ChevronDown,
 	GitBranch,
 	GitCommit,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitStatus } from "../../shared/types";
+import BranchPicker from "./git/BranchPicker";
 
 interface Props {
 	projectPath: string;
+	onMessage?: (msg: { type: "success" | "error" | "info"; text: string }) => void;
+	onRefresh?: () => void;
 }
 
-export default function GitStatusBar({ projectPath }: Props) {
+export default function GitStatusBar({ projectPath, onMessage, onRefresh }: Props) {
 	const [status, setStatus] = useState<GitStatus | null>(null);
+	const [showBranchPicker, setShowBranchPicker] = useState(false);
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const mountedRef = useRef(false);
 	const activeProjectPathRef = useRef(projectPath);
@@ -72,20 +77,42 @@ export default function GitStatusBar({ projectPath }: Props) {
 		};
 	}, [projectPath, fetchStatus]);
 
+	const handleBranchChanged = useCallback(() => {
+		fetchStatus();
+		if (onRefresh) onRefresh();
+	}, [fetchStatus, onRefresh]);
+
 	if (!status || !status.isRepo) return null;
 
 	const hasChanges =
 		status.modified + status.staged + status.untracked + status.conflicted > 0;
 
 	return (
-		<div className="flex items-center gap-2 flex-wrap">
-			{/* Branch */}
-			<div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-connexio-bg-tertiary">
+		<div className="flex items-center gap-2 flex-wrap relative">
+			{/* Branch — clickable */}
+			<button
+				onClick={() => setShowBranchPicker(!showBranchPicker)}
+				className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-connexio-bg-tertiary hover:bg-connexio-accent/10 transition-colors cursor-pointer"
+				title="Switch branch"
+				type="button"
+			>
 				<GitBranch size={10} className="text-connexio-accent" />
 				<span className="text-[10px] font-medium text-connexio-text-secondary">
 					{status.branch}
 				</span>
-			</div>
+				<ChevronDown size={8} className="text-connexio-text-muted" />
+			</button>
+
+			{/* Branch Picker */}
+			{showBranchPicker && onMessage && (
+				<BranchPicker
+					projectPath={projectPath}
+					currentBranch={status.branch}
+					onClose={() => setShowBranchPicker(false)}
+					onMessage={onMessage}
+					onBranchChanged={handleBranchChanged}
+				/>
+			)}
 
 			{/* Ahead/Behind */}
 			{(status.ahead > 0 || status.behind > 0) && (

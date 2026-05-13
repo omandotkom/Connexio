@@ -1,10 +1,18 @@
-import { ArrowUp, GitCommit, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import {
+	ArrowDown,
+	ArrowUp,
+	GitCommit,
+	Loader2,
+	MoreHorizontal,
+	RefreshCw,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitActionResult } from "../../../shared/types";
 
 interface Props {
 	projectPath: string;
 	stagedCount: number;
+	hasUncommittedChanges: boolean;
 	onMessage: (msg: { type: "success" | "error" | "info"; text: string }) => void;
 	onRefresh: () => void;
 }
@@ -12,14 +20,36 @@ interface Props {
 export default function CommitBox({
 	projectPath,
 	stagedCount,
+	hasUncommittedChanges,
 	onMessage,
 	onRefresh,
 }: Props) {
 	const [commitMessage, setCommitMessage] = useState("");
 	const [isCommitting, setIsCommitting] = useState(false);
 	const [isPushing, setIsPushing] = useState(false);
+	const [isFetching, setIsFetching] = useState(false);
+	const [isPulling, setIsPulling] = useState(false);
+	const [showMenu, setShowMenu] = useState(false);
+	const menuRef = useRef<HTMLDivElement>(null);
 
-	const canCommit = stagedCount > 0 && commitMessage.trim().length > 0 && !isCommitting && !isPushing;
+	const canCommit =
+		stagedCount > 0 &&
+		commitMessage.trim().length > 0 &&
+		!isCommitting &&
+		!isPushing;
+	const isBusy = isCommitting || isPushing || isFetching || isPulling;
+
+	// Close menu on outside click
+	useEffect(() => {
+		if (!showMenu) return;
+		const handleClick = (e: MouseEvent) => {
+			if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+				setShowMenu(false);
+			}
+		};
+		document.addEventListener("mousedown", handleClick);
+		return () => document.removeEventListener("mousedown", handleClick);
+	}, [showMenu]);
 
 	const handleCommit = useCallback(async () => {
 		if (!canCommit) return;
@@ -57,14 +87,15 @@ export default function CommitBox({
 			}
 			setIsCommitting(false);
 			setIsPushing(true);
-			const pushResult: GitActionResult = await window.connexio.git.push(projectPath);
+			const pushResult: GitActionResult =
+				await window.connexio.git.push(projectPath);
 			if (pushResult.success) {
 				onMessage({ type: "success", text: "Committed and pushed" });
 				setCommitMessage("");
 				onRefresh();
 			} else {
 				onMessage({ type: "error", text: pushResult.message });
-				onRefresh(); // commit succeeded, refresh anyway
+				onRefresh();
 			}
 		} catch {
 			onMessage({ type: "error", text: "Commit & push failed unexpectedly" });
@@ -74,10 +105,11 @@ export default function CommitBox({
 	}, [canCommit, projectPath, commitMessage, onMessage, onRefresh]);
 
 	const handlePush = useCallback(async () => {
-		if (isPushing || isCommitting) return;
+		if (isBusy) return;
 		setIsPushing(true);
 		try {
-			const result: GitActionResult = await window.connexio.git.push(projectPath);
+			const result: GitActionResult =
+				await window.connexio.git.push(projectPath);
 			if (result.success) {
 				onMessage({ type: "success", text: result.message });
 				onRefresh();
@@ -88,10 +120,47 @@ export default function CommitBox({
 			onMessage({ type: "error", text: "Push failed unexpectedly" });
 		}
 		setIsPushing(false);
-	}, [isPushing, isCommitting, projectPath, onMessage, onRefresh]);
+	}, [isBusy, projectPath, onMessage, onRefresh]);
+
+	const handleFetch = useCallback(async () => {
+		if (isBusy) return;
+		setIsFetching(true);
+		setShowMenu(false);
+		try {
+			const result: GitActionResult =
+				await window.connexio.git.fetch(projectPath);
+			if (result.success) {
+				onMessage({ type: "success", text: result.message });
+				onRefresh();
+			} else {
+				onMessage({ type: "error", text: result.message });
+			}
+		} catch {
+			onMessage({ type: "error", text: "Fetch failed unexpectedly" });
+		}
+		setIsFetching(false);
+	}, [isBusy, projectPath, onMessage, onRefresh]);
+
+	const handlePull = useCallback(async () => {
+		if (isBusy) return;
+		setIsPulling(true);
+		setShowMenu(false);
+		try {
+			const result: GitActionResult =
+				await window.connexio.git.pull(projectPath);
+			if (result.success) {
+				onMessage({ type: "success", text: result.message });
+				onRefresh();
+			} else {
+				onMessage({ type: "error", text: result.message });
+			}
+		} catch {
+			onMessage({ type: "error", text: "Pull failed unexpectedly" });
+		}
+		setIsPulling(false);
+	}, [isBusy, projectPath, onMessage, onRefresh]);
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-		// Ctrl/Cmd + Enter to commit
 		if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
 			e.preventDefault();
 			handleCommit();
@@ -112,7 +181,7 @@ export default function CommitBox({
 				}
 				className="w-full bg-connexio-bg-tertiary border border-connexio-border rounded px-2 py-1.5 text-[11px] text-connexio-text placeholder:text-connexio-text-muted/50 outline-none focus:border-connexio-accent/50 resize-none transition-colors"
 				rows={2}
-				disabled={isCommitting || isPushing}
+				disabled={isBusy}
 			/>
 
 			{/* Action buttons */}
@@ -156,20 +225,54 @@ export default function CommitBox({
 					Commit & Push
 				</button>
 
-				<button
-					onClick={handlePush}
-					disabled={isPushing || isCommitting}
-					className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded border border-connexio-border text-connexio-text-muted hover:border-connexio-text-muted/50 hover:text-connexio-text-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors ml-auto"
-					title="Push to remote"
-					type="button"
-				>
-					{isPushing ? (
-						<Loader2 size={10} className="animate-spin" />
-					) : (
-						<ArrowUp size={10} />
+				{/* More actions menu */}
+				<div className="relative ml-auto" ref={menuRef}>
+					<button
+						onClick={() => setShowMenu(!showMenu)}
+						disabled={isBusy}
+						className="flex items-center gap-1 px-1.5 py-1 text-[10px] rounded border border-connexio-border text-connexio-text-muted hover:border-connexio-text-muted/50 hover:text-connexio-text-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+						title="More actions"
+						type="button"
+					>
+						{isFetching || isPulling ? (
+							<Loader2 size={10} className="animate-spin" />
+						) : (
+							<MoreHorizontal size={12} />
+						)}
+					</button>
+
+					{showMenu && (
+						<div className="absolute right-0 top-full mt-1 z-50 w-40 bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-lg overflow-hidden">
+							<button
+								onClick={handleFetch}
+								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+								type="button"
+							>
+								<RefreshCw size={11} className="text-connexio-text-muted" />
+								Fetch
+							</button>
+							<button
+								onClick={handlePull}
+								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+								type="button"
+							>
+								<ArrowDown size={11} className="text-connexio-text-muted" />
+								Pull
+								{hasUncommittedChanges && (
+									<span className="ml-auto text-[9px] text-yellow-400">!</span>
+								)}
+							</button>
+							<button
+								onClick={handlePush}
+								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+								type="button"
+							>
+								<ArrowUp size={11} className="text-connexio-text-muted" />
+								Push
+							</button>
+						</div>
 					)}
-					Push
-				</button>
+				</div>
 			</div>
 		</div>
 	);

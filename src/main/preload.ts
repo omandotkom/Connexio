@@ -122,8 +122,18 @@ contextBridge.exposeInMainWorld("connexio", {
 			ipcRenderer.invoke("git:commit", projectPath, message),
 		push: (projectPath: string) =>
 			ipcRenderer.invoke("git:push", projectPath),
+		fetch: (projectPath: string) =>
+			ipcRenderer.invoke("git:fetch", projectPath),
+		pull: (projectPath: string) =>
+			ipcRenderer.invoke("git:pull", projectPath),
 		history: (projectPath: string, limit?: number) =>
 			ipcRenderer.invoke("git:history", projectPath, limit),
+		branches: (projectPath: string) =>
+			ipcRenderer.invoke("git:branches", projectPath),
+		checkout: (projectPath: string, branch: string) =>
+			ipcRenderer.invoke("git:checkout", projectPath, branch),
+		createBranch: (projectPath: string, branchName: string) =>
+			ipcRenderer.invoke("git:create-branch", projectPath, branchName),
 	},
 
 	updater: {
