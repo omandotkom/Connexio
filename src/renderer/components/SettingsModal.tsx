@@ -642,6 +642,26 @@ function AboutSettings() {
 					Made with ♥ by Connexio Team
 				</p>
 			</div>
+
+			{/* Support / Donate */}
+			<div className="pt-3 border-t border-connexio-border space-y-3">
+				<h3 className="text-xs font-semibold text-connexio-text-secondary uppercase tracking-wider">
+					Support
+				</h3>
+				<p className="text-[11px] text-connexio-text-muted leading-relaxed">
+					Connexio is free and open source. If you find it useful, consider supporting development.
+				</p>
+				<div className="flex flex-col items-center gap-2 p-4 bg-connexio-bg-tertiary rounded-lg border border-connexio-border">
+					<img
+						src={new URL("../assets/download.png", import.meta.url).href}
+						alt="Donate QR Code"
+						className="w-40 h-40 rounded-md"
+					/>
+					<p className="text-[10px] text-connexio-text-muted text-center">
+						Scan to donate
+					</p>
+				</div>
+			</div>
 		</div>
 	);
 }
