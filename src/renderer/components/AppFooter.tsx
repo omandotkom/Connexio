@@ -23,7 +23,6 @@ export default function AppFooter() {
 
 	const project = projects.find((p) => p.id === activeProjectId);
 
-	// Fetch git status for active project
 	const fetchGitStatus = useCallback(async () => {
 		if (!project) {
 			setGitStatus(null);
@@ -41,7 +40,6 @@ export default function AppFooter() {
 		mountedRef.current = true;
 		fetchGitStatus();
 
-		// Poll every 30s
 		if (intervalRef.current) clearInterval(intervalRef.current);
 		intervalRef.current = setInterval(fetchGitStatus, 30000);
 
@@ -51,7 +49,6 @@ export default function AppFooter() {
 		};
 	}, [fetchGitStatus]);
 
-	// Get app version
 	useEffect(() => {
 		window.connexio.app.getVersion().then((v: string) => setAppVersion(v));
 	}, []);
@@ -76,38 +73,45 @@ export default function AppFooter() {
 		: 0;
 
 	return (
-		<div className="flex items-center h-[22px] px-3 bg-connexio-bg-secondary border-t border-connexio-border text-[10px] select-none gap-3">
-			{/* Left: Project */}
+		<div className="flex items-center h-[28px] px-2 bg-connexio-bg-secondary border-t border-connexio-border text-[11px] select-none gap-2">
+			{/* Project segment */}
 			{project && (
 				<button
 					onClick={handleCopyPath}
-					className="flex items-center gap-1 text-connexio-text-muted hover:text-connexio-text-secondary transition-colors truncate max-w-[180px]"
-					title={pathCopied ? "Copied!" : `Click to copy: ${project.path}`}
+					className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary hover:bg-connexio-accent/10 transition-colors truncate max-w-[200px]"
+					title={pathCopied ? "Path copied!" : `Click to copy: ${project.path}`}
 					type="button"
 				>
-					<span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-					<span className="truncate">{project.name}</span>
+					<span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+					<span className="truncate font-medium text-connexio-text-secondary">
+						{pathCopied ? "Copied!" : project.name}
+					</span>
 				</button>
 			)}
 
-			{/* Git status */}
+			{/* Separator */}
+			{project && gitStatus?.isRepo && (
+				<div className="w-px h-3.5 bg-connexio-border" />
+			)}
+
+			{/* Git segment */}
 			{gitStatus?.isRepo && (
-				<div className="flex items-center gap-1.5 text-connexio-text-muted">
-					<GitBranch size={9} className="text-connexio-accent" />
-					<span className="text-connexio-text-secondary">
+				<div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary">
+					<GitBranch size={11} className="text-connexio-accent flex-shrink-0" />
+					<span className="font-medium text-connexio-text-secondary">
 						{gitStatus.branch}
 					</span>
 					{(gitStatus.ahead > 0 || gitStatus.behind > 0) && (
-						<span className="flex items-center gap-0.5">
+						<span className="flex items-center gap-1">
 							{gitStatus.ahead > 0 && (
-								<span className="flex items-center gap-0 text-green-400">
-									<ArrowUp size={8} />
+								<span className="flex items-center gap-0 text-green-400 font-medium">
+									<ArrowUp size={10} />
 									{gitStatus.ahead}
 								</span>
 							)}
 							{gitStatus.behind > 0 && (
-								<span className="flex items-center gap-0 text-yellow-400">
-									<ArrowDown size={8} />
+								<span className="flex items-center gap-0 text-yellow-400 font-medium">
+									<ArrowDown size={10} />
 									{gitStatus.behind}
 								</span>
 							)}
@@ -119,19 +123,24 @@ export default function AppFooter() {
 						</span>
 					)}
 					{gitStatus.conflicted > 0 && (
-						<span className="flex items-center gap-0.5 text-red-400">
-							<AlertCircle size={8} />
+						<span className="flex items-center gap-0.5 text-red-400 font-medium">
+							<AlertCircle size={10} />
 							{gitStatus.conflicted}
 						</span>
 					)}
 				</div>
 			)}
 
-			{/* Terminal info */}
+			{/* Separator */}
 			{activeTab && (
-				<div className="flex items-center gap-1 text-connexio-text-muted">
-					<Terminal size={9} />
-					<span className="truncate max-w-[100px]">{activeTab.label}</span>
+				<div className="w-px h-3.5 bg-connexio-border" />
+			)}
+
+			{/* Terminal segment */}
+			{activeTab && (
+				<div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary text-connexio-text-muted">
+					<Terminal size={11} className="flex-shrink-0" />
+					<span className="truncate max-w-[120px]">{activeTab.label}</span>
 					{tabs.length > 1 && (
 						<span className="text-connexio-text-muted/60">
 							· {tabs.length} tabs
@@ -143,17 +152,24 @@ export default function AppFooter() {
 			{/* Spacer */}
 			<div className="flex-1" />
 
-			{/* Notifications */}
+			{/* Notifications segment */}
 			{unreadCount > 0 && (
-				<div className="flex items-center gap-1 text-connexio-accent">
-					<Bell size={9} />
-					<span>{unreadCount}</span>
+				<div className="flex items-center gap-1 px-2 py-0.5 rounded bg-connexio-accent/10 text-connexio-accent font-medium">
+					<Bell size={11} />
+					<span>{unreadCount} new</span>
 				</div>
+			)}
+
+			{/* Separator */}
+			{appVersion && (
+				<div className="w-px h-3.5 bg-connexio-border" />
 			)}
 
 			{/* Version */}
 			{appVersion && (
-				<span className="text-connexio-text-muted/60">v{appVersion}</span>
+				<span className="px-1.5 py-0.5 rounded bg-connexio-bg-tertiary text-connexio-text-muted">
+					v{appVersion}
+				</span>
 			)}
 		</div>
 	);
