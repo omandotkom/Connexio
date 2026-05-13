@@ -73,6 +73,15 @@ export default function AppFooter() {
 		setTimeout(() => setPathCopied(false), 2000);
 	}, [project]);
 
+	const handleGitClick = useCallback(() => {
+		window.dispatchEvent(new CustomEvent("connexio:open-panel", { detail: "source" }));
+	}, []);
+
+	const handleTerminalClick = useCallback(() => {
+		// Close side panel to focus terminal
+		window.dispatchEvent(new CustomEvent("connexio:open-panel", { detail: "close" }));
+	}, []);
+
 	const handleOpenSettings = useCallback(() => {
 		if (!isSettingsOpen) {
 			useSettingsStore.getState().openSettings();
@@ -117,9 +126,14 @@ export default function AppFooter() {
 
 			{/* Right section — matches workspace area */}
 			<div className="flex-1 flex items-center px-3 gap-3">
-				{/* Git segment */}
+				{/* Git segment — click to open source panel */}
 				{gitStatus?.isRepo && (
-					<div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary">
+					<button
+						onClick={handleGitClick}
+						className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary hover:bg-connexio-accent/10 transition-colors cursor-pointer"
+						title="Open Source Control"
+						type="button"
+					>
 						<GitBranch size={12} className="text-connexio-accent flex-shrink-0" />
 						<span className="font-medium text-connexio-text-secondary">
 							{gitStatus.branch}
@@ -151,12 +165,17 @@ export default function AppFooter() {
 								{gitStatus.conflicted}
 							</span>
 						)}
-					</div>
+					</button>
 				)}
 
-				{/* Terminal segment */}
+				{/* Terminal segment — click to focus terminal */}
 				{activeTab && (
-					<div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary text-connexio-text-muted">
+					<button
+						onClick={handleTerminalClick}
+						className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-connexio-bg-tertiary hover:bg-connexio-accent/10 transition-colors cursor-pointer text-connexio-text-muted"
+						title="Focus terminal"
+						type="button"
+					>
 						<Terminal size={12} className="flex-shrink-0" />
 						<span className="truncate max-w-[140px]">{activeTab.label}</span>
 						{tabs.length > 1 && (
@@ -164,7 +183,7 @@ export default function AppFooter() {
 								· {tabs.length} tabs
 							</span>
 						)}
-					</div>
+					</button>
 				)}
 
 				{/* Spacer */}

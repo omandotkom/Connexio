@@ -73,6 +73,21 @@ export default function Workspace() {
 		};
 	}, []);
 
+	// Listen for footer panel open/close events
+	useEffect(() => {
+		const handlePanelEvent = (e: Event) => {
+			const detail = (e as CustomEvent).detail;
+			if (detail === "close") {
+				setShowSidePanel(false);
+			} else if (detail === "source" || detail === "tasks" || detail === "ssh") {
+				setSidePanelTab(detail as SidePanelTab);
+				setShowSidePanel(true);
+			}
+		};
+		window.addEventListener("connexio:open-panel", handlePanelEvent);
+		return () => window.removeEventListener("connexio:open-panel", handlePanelEvent);
+	}, []);
+
 	if (!activeProjectId) return null;
 
 	const project = projects.find((p) => p.id === activeProjectId);
