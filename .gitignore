@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+release-artifacts/
 .env
 *.log
 .DS_Store
