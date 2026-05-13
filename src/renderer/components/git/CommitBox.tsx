@@ -225,7 +225,7 @@ export default function CommitBox({
 	};
 
 	return (
-		<div className="px-3 py-2 border-b border-connexio-border space-y-2">
+		<div className="px-3 py-2 border-b border-connexio-border space-y-2 relative overflow-visible">
 			{/* Commit message */}
 			<textarea
 				value={commitMessage}

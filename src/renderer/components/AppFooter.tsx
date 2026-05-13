@@ -73,7 +73,7 @@ export default function AppFooter() {
 		: 0;
 
 	return (
-		<div className="flex items-center h-[28px] px-2 bg-connexio-bg-secondary border-t border-connexio-border text-[11px] select-none gap-2">
+		<div className="flex items-center h-[32px] px-2.5 bg-connexio-bg-secondary border-t border-connexio-border text-[12px] select-none gap-2.5">
 			{/* Project segment */}
 			{project && (
 				<button

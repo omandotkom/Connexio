@@ -931,7 +931,7 @@ export default function SourcePanel({ projectPath }: Props) {
 		<>
 			<div className="flex flex-col h-full">
 				{/* Git status bar */}
-				<div className="px-3 py-1.5 border-b border-connexio-border">
+				<div className="px-3 py-1.5 border-b border-connexio-border relative overflow-visible">
 					<GitStatusBar projectPath={projectPath} onMessage={showMessage} onRefresh={handleRefresh} />
 				</div>
 
@@ -966,12 +966,14 @@ export default function SourcePanel({ projectPath }: Props) {
 
 				{/* History tab */}
 				{activeTab === "history" && (
-					<GitHistoryPanel projectPath={projectPath} />
+					<div className="flex-1 min-h-0 overflow-hidden">
+						<GitHistoryPanel projectPath={projectPath} />
+					</div>
 				)}
 
 				{/* Changes tab */}
 				{activeTab === "changes" && (
-					<>
+					<div className="flex flex-col flex-1 min-h-0">
 						{/* Commit box */}
 						<CommitBox
 							projectPath={projectPath}
@@ -1163,7 +1165,7 @@ export default function SourcePanel({ projectPath }: Props) {
 						</>
 					)}
 				</div>
-					</>
+					</div>
 				)}
 			</div>
 
