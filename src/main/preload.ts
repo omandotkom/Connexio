@@ -134,6 +134,18 @@ contextBridge.exposeInMainWorld("connexio", {
 			ipcRenderer.invoke("git:checkout", projectPath, branch),
 		createBranch: (projectPath: string, branchName: string) =>
 			ipcRenderer.invoke("git:create-branch", projectPath, branchName),
+		publishBranch: (projectPath: string) =>
+			ipcRenderer.invoke("git:publish-branch", projectPath),
+		stashList: (projectPath: string) =>
+			ipcRenderer.invoke("git:stash-list", projectPath),
+		stashSave: (projectPath: string, message?: string) =>
+			ipcRenderer.invoke("git:stash-save", projectPath, message),
+		stashPop: (projectPath: string, index?: number) =>
+			ipcRenderer.invoke("git:stash-pop", projectPath, index),
+		stashApply: (projectPath: string, index?: number) =>
+			ipcRenderer.invoke("git:stash-apply", projectPath, index),
+		stashDrop: (projectPath: string, index?: number) =>
+			ipcRenderer.invoke("git:stash-drop", projectPath, index),
 	},
 
 	updater: {

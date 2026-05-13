@@ -1,10 +1,12 @@
 import {
 	ArrowDown,
 	ArrowUp,
+	Archive,
 	GitCommit,
 	Loader2,
 	MoreHorizontal,
 	RefreshCw,
+	Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { GitActionResult } from "../../../shared/types";
@@ -13,6 +15,7 @@ interface Props {
 	projectPath: string;
 	stagedCount: number;
 	hasUncommittedChanges: boolean;
+	hasUpstream: boolean;
 	onMessage: (msg: { type: "success" | "error" | "info"; text: string }) => void;
 	onRefresh: () => void;
 }
@@ -21,6 +24,7 @@ export default function CommitBox({
 	projectPath,
 	stagedCount,
 	hasUncommittedChanges,
+	hasUpstream,
 	onMessage,
 	onRefresh,
 }: Props) {
@@ -160,6 +164,59 @@ export default function CommitBox({
 		setIsPulling(false);
 	}, [isBusy, projectPath, onMessage, onRefresh]);
 
+	const handlePublish = useCallback(async () => {
+		if (isBusy) return;
+		setIsPushing(true);
+		setShowMenu(false);
+		try {
+			const result: GitActionResult =
+				await window.connexio.git.publishBranch(projectPath);
+			if (result.success) {
+				onMessage({ type: "success", text: result.message });
+				onRefresh();
+			} else {
+				onMessage({ type: "error", text: result.message });
+			}
+		} catch {
+			onMessage({ type: "error", text: "Publish failed unexpectedly" });
+		}
+		setIsPushing(false);
+	}, [isBusy, projectPath, onMessage, onRefresh]);
+
+	const handleStash = useCallback(async () => {
+		if (isBusy) return;
+		setShowMenu(false);
+		try {
+			const result: GitActionResult =
+				await window.connexio.git.stashSave(projectPath);
+			if (result.success) {
+				onMessage({ type: "success", text: result.message });
+				onRefresh();
+			} else {
+				onMessage({ type: "error", text: result.message });
+			}
+		} catch {
+			onMessage({ type: "error", text: "Stash failed unexpectedly" });
+		}
+	}, [isBusy, projectPath, onMessage, onRefresh]);
+
+	const handleStashPop = useCallback(async () => {
+		if (isBusy) return;
+		setShowMenu(false);
+		try {
+			const result: GitActionResult =
+				await window.connexio.git.stashPop(projectPath);
+			if (result.success) {
+				onMessage({ type: "success", text: result.message });
+				onRefresh();
+			} else {
+				onMessage({ type: "error", text: result.message });
+			}
+		} catch {
+			onMessage({ type: "error", text: "Stash pop failed unexpectedly" });
+		}
+	}, [isBusy, projectPath, onMessage, onRefresh]);
+
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
 			e.preventDefault();
@@ -242,7 +299,7 @@ export default function CommitBox({
 					</button>
 
 					{showMenu && (
-						<div className="absolute right-0 top-full mt-1 z-50 w-40 bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-lg overflow-hidden">
+						<div className="absolute right-0 top-full mt-1 z-50 w-44 bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-lg overflow-hidden">
 							<button
 								onClick={handleFetch}
 								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
@@ -269,6 +326,33 @@ export default function CommitBox({
 							>
 								<ArrowUp size={11} className="text-connexio-text-muted" />
 								Push
+							</button>
+							{!hasUpstream && (
+								<button
+									onClick={handlePublish}
+									className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+									type="button"
+								>
+									<Upload size={11} className="text-connexio-text-muted" />
+									Publish Branch
+								</button>
+							)}
+							<div className="border-t border-connexio-border/50 my-0.5" />
+							<button
+								onClick={handleStash}
+								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+								type="button"
+							>
+								<Archive size={11} className="text-connexio-text-muted" />
+								Stash Changes
+							</button>
+							<button
+								onClick={handleStashPop}
+								className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+								type="button"
+							>
+								<Archive size={11} className="text-connexio-accent" />
+								Pop Stash
 							</button>
 						</div>
 					)}

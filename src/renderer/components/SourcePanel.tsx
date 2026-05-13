@@ -38,12 +38,13 @@ interface Props {
 	projectPath: string;
 }
 
-type FileGroup = "staged" | "modified" | "untracked";
+type FileGroup = "staged" | "modified" | "untracked" | "conflicted";
 
 interface GroupedFiles {
 	staged: GitChangedFile[];
 	modified: GitChangedFile[];
 	untracked: GitChangedFile[];
+	conflicted: GitChangedFile[];
 }
 
 // ============================================
@@ -116,9 +117,23 @@ function trimDiffCache(currentPath: string) {
 // ============================================
 
 function groupFiles(files: GitChangedFile[]): GroupedFiles {
-	const grouped: GroupedFiles = { staged: [], modified: [], untracked: [] };
+	const grouped: GroupedFiles = { staged: [], modified: [], untracked: [], conflicted: [] };
 
 	for (const file of files) {
+		const x = file.indexStatus as string;
+		const y = file.workTreeStatus as string;
+
+		// Conflict detection
+		if (
+			x === "U" ||
+			y === "U" ||
+			(x === "A" && y === "A") ||
+			(x === "D" && y === "D")
+		) {
+			grouped.conflicted.push(file);
+			continue;
+		}
+
 		if (file.indexStatus === "?" && file.workTreeStatus === "?") {
 			grouped.untracked.push(file);
 		} else {
@@ -546,6 +561,7 @@ export default function SourcePanel({ projectPath }: Props) {
 		staged: INITIAL_VISIBLE_FILES_PER_GROUP,
 		modified: INITIAL_VISIBLE_FILES_PER_GROUP,
 		untracked: INITIAL_VISIBLE_FILES_PER_GROUP,
+		conflicted: INITIAL_VISIBLE_FILES_PER_GROUP,
 	});
 	const [modalOpen, setModalOpen] = useState(false);
 	const [modalInitialIndex, setModalInitialIndex] = useState(0);
@@ -629,6 +645,7 @@ export default function SourcePanel({ projectPath }: Props) {
 			staged: INITIAL_VISIBLE_FILES_PER_GROUP,
 			modified: INITIAL_VISIBLE_FILES_PER_GROUP,
 			untracked: INITIAL_VISIBLE_FILES_PER_GROUP,
+			conflicted: INITIAL_VISIBLE_FILES_PER_GROUP,
 		});
 		setModalOpen(false);
 		setFilterQuery("");
@@ -694,16 +711,18 @@ export default function SourcePanel({ projectPath }: Props) {
 			staged: filterFiles(grouped.staged, filterQuery, "staged"),
 			modified: filterFiles(grouped.modified, filterQuery, "modified"),
 			untracked: filterFiles(grouped.untracked, filterQuery, "untracked"),
+			conflicted: filterFiles(grouped.conflicted, filterQuery, "conflicted"),
 		};
 	}, [grouped, filterQuery]);
 
 	const totalChanges =
-		grouped.staged.length + grouped.modified.length + grouped.untracked.length;
+		grouped.staged.length + grouped.modified.length + grouped.untracked.length + grouped.conflicted.length;
 	const filteredTotal =
-		filteredGrouped.staged.length + filteredGrouped.modified.length + filteredGrouped.untracked.length;
+		filteredGrouped.staged.length + filteredGrouped.modified.length + filteredGrouped.untracked.length + filteredGrouped.conflicted.length;
 
 	const modalFiles = useMemo<DiffFileContext[]>(() => {
 		return [
+			...filteredGrouped.conflicted.map((f) => ({ file: f, group: "modified" as const })),
 			...filteredGrouped.staged.map((f) => ({ file: f, group: "staged" as const })),
 			...filteredGrouped.modified.map((f) => ({ file: f, group: "modified" as const })),
 			...filteredGrouped.untracked.map((f) => ({
@@ -711,7 +730,7 @@ export default function SourcePanel({ projectPath }: Props) {
 				group: "untracked" as const,
 			})),
 		];
-	}, [filteredGrouped.staged, filteredGrouped.modified, filteredGrouped.untracked]);
+	}, [filteredGrouped.conflicted, filteredGrouped.staged, filteredGrouped.modified, filteredGrouped.untracked]);
 
 	const toggleFile = useCallback((key: string) => {
 		setExpandedFiles((prev) => {
@@ -830,14 +849,20 @@ export default function SourcePanel({ projectPath }: Props) {
 					}}
 				>
 					{isCollapsed ? (
-						<ChevronRight size={11} className="text-connexio-text-muted" />
+						<ChevronRight size={11} className={group === "conflicted" ? "text-red-400" : "text-connexio-text-muted"} />
 					) : (
-						<ChevronDown size={11} className="text-connexio-text-muted" />
+						<ChevronDown size={11} className={group === "conflicted" ? "text-red-400" : "text-connexio-text-muted"} />
 					)}
-					<span className="text-[10px] font-semibold uppercase tracking-wider text-connexio-text-secondary flex-1">
+					<span className={`text-[10px] font-semibold uppercase tracking-wider flex-1 ${
+						group === "conflicted" ? "text-red-300" : "text-connexio-text-secondary"
+					}`}>
 						{label}
 					</span>
-					<span className="text-[10px] text-connexio-text-muted bg-connexio-bg-tertiary px-1.5 rounded-full">
+					<span className={`text-[10px] px-1.5 rounded-full ${
+						group === "conflicted"
+							? "text-red-300 bg-red-500/15"
+							: "text-connexio-text-muted bg-connexio-bg-tertiary"
+					}`}>
 						{items.length}
 					</span>
 
@@ -952,6 +977,7 @@ export default function SourcePanel({ projectPath }: Props) {
 							projectPath={projectPath}
 							stagedCount={grouped.staged.length}
 							hasUncommittedChanges={totalChanges > 0}
+							hasUpstream={true}
 							onMessage={showMessage}
 							onRefresh={handleRefresh}
 						/>
@@ -1116,6 +1142,21 @@ export default function SourcePanel({ projectPath }: Props) {
 						</div>
 					) : (
 						<>
+							{/* Conflict banner */}
+							{filteredGrouped.conflicted.length > 0 && (
+								<div className="mx-2 mt-1 mb-2 px-2.5 py-2 rounded border border-red-500/30 bg-red-500/5">
+									<div className="flex items-center gap-1.5 mb-1">
+										<AlertCircle size={11} className="text-red-400" />
+										<span className="text-[10px] font-semibold text-red-300">
+											Merge Conflicts ({filteredGrouped.conflicted.length})
+										</span>
+									</div>
+									<p className="text-[9px] text-red-300/70 leading-tight">
+										Resolve conflicts, then stage files and commit.
+									</p>
+								</div>
+							)}
+							{renderGroup("conflicted", "Conflicts", filteredGrouped.conflicted)}
 							{renderGroup("staged", "Staged", filteredGrouped.staged)}
 							{renderGroup("modified", "Modified", filteredGrouped.modified)}
 							{renderGroup("untracked", "Untracked", filteredGrouped.untracked)}

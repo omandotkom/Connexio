@@ -1084,6 +1084,179 @@ async function gitCreateBranch(
 }
 
 // ============================================
+// Publish Branch (push -u)
+// ============================================
+
+async function gitPublishBranch(projectPath: string): Promise<GitActionResult> {
+	// Get current branch name
+	try {
+		const { stdout: branchOut } = await execFileAsync(
+			"git",
+			["rev-parse", "--abbrev-ref", "HEAD"],
+			{ cwd: projectPath, timeout: 5000, windowsHide: true },
+		);
+		const branch = branchOut.trim();
+		if (!branch || branch === "HEAD") {
+			return { success: false, message: "Cannot publish: detached HEAD state" };
+		}
+
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["push", "-u", "origin", branch],
+			{
+				cwd: projectPath,
+				timeout: 60000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return {
+			success: true,
+			message: `Published branch '${branch}' to origin`,
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Publish failed";
+		if (errMsg.includes("Authentication") || errMsg.includes("fatal: could not read")) {
+			return { success: false, message: "Authentication failed. Check credentials." };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Publish failed" };
+	}
+}
+
+// ============================================
+// Stash operations
+// ============================================
+
+interface GitStashEntry {
+	index: number;
+	message: string;
+}
+
+async function gitStashList(projectPath: string): Promise<GitStashEntry[]> {
+	try {
+		const { stdout } = await execFileAsync(
+			"git",
+			["stash", "list", "--format=%gd%x1f%s"],
+			{
+				cwd: projectPath,
+				timeout: 5000,
+				windowsHide: true,
+				maxBuffer: 2 * 1024 * 1024,
+			},
+		);
+		if (!stdout.trim()) return [];
+		return stdout
+			.trim()
+			.split("\n")
+			.map((line, i) => {
+				const parts = line.split("\x1f");
+				return {
+					index: i,
+					message: parts[1] || parts[0] || `stash@{${i}}`,
+				};
+			});
+	} catch {
+		return [];
+	}
+}
+
+async function gitStashSave(
+	projectPath: string,
+	message?: string,
+): Promise<GitActionResult> {
+	try {
+		const args = ["stash", "push"];
+		if (message && message.trim()) {
+			args.push("-m", message.trim());
+		}
+		const { stdout, stderr } = await execFileAsync("git", args, {
+			cwd: projectPath,
+			timeout: 15000,
+			windowsHide: true,
+			maxBuffer: 5 * 1024 * 1024,
+		});
+		const output = stdout || stderr;
+		if (output.includes("No local changes")) {
+			return { success: false, message: "No local changes to stash" };
+		}
+		return { success: true, message: "Changes stashed", output };
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Stash failed";
+		if (errMsg.includes("No local changes")) {
+			return { success: false, message: "No local changes to stash" };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Stash failed" };
+	}
+}
+
+async function gitStashPop(projectPath: string, index = 0): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["stash", "pop", `stash@{${index}}`],
+			{
+				cwd: projectPath,
+				timeout: 15000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return { success: true, message: "Stash popped", output: stdout || stderr };
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Stash pop failed";
+		if (errMsg.includes("CONFLICT")) {
+			return { success: false, message: "Stash pop resulted in conflicts. Resolve manually." };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Stash pop failed" };
+	}
+}
+
+async function gitStashApply(projectPath: string, index = 0): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["stash", "apply", `stash@{${index}}`],
+			{
+				cwd: projectPath,
+				timeout: 15000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return { success: true, message: "Stash applied", output: stdout || stderr };
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Stash apply failed";
+		if (errMsg.includes("CONFLICT")) {
+			return { success: false, message: "Stash apply resulted in conflicts. Resolve manually." };
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Stash apply failed" };
+	}
+}
+
+async function gitStashDrop(projectPath: string, index = 0): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["stash", "drop", `stash@{${index}}`],
+			{
+				cwd: projectPath,
+				timeout: 5000,
+				windowsHide: true,
+			},
+		);
+		return { success: true, message: "Stash dropped", output: stdout || stderr };
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		return { success: false, message: (e.stderr || e.message || "Drop failed").split("\n")[0] };
+	}
+}
+
+// ============================================
 // IPC Setup
 // ============================================
 
@@ -1214,6 +1387,51 @@ export function setupGitIPC() {
 		async (_event, projectPath: string, branchName: string) => {
 			const result = await gitCreateBranch(projectPath, branchName);
 			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle("git:publish-branch", async (_event, projectPath: string) => {
+		const result = await gitPublishBranch(projectPath);
+		if (result.success) invalidateStatusCaches(projectPath);
+		return result;
+	});
+
+	ipcMain.handle("git:stash-list", async (_event, projectPath: string) => {
+		return gitStashList(projectPath);
+	});
+
+	ipcMain.handle(
+		"git:stash-save",
+		async (_event, projectPath: string, message?: string) => {
+			const result = await gitStashSave(projectPath, message);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		"git:stash-pop",
+		async (_event, projectPath: string, index?: number) => {
+			const result = await gitStashPop(projectPath, index);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		"git:stash-apply",
+		async (_event, projectPath: string, index?: number) => {
+			const result = await gitStashApply(projectPath, index);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle(
+		"git:stash-drop",
+		async (_event, projectPath: string, index?: number) => {
+			const result = await gitStashDrop(projectPath, index);
 			return result;
 		},
 	);

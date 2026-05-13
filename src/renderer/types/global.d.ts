@@ -136,6 +136,28 @@ interface ConnexioAPI {
 			projectPath: string,
 			branchName: string,
 		) => Promise<import("../../shared/types").GitActionResult>;
+		publishBranch: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		stashList: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitStashEntry[]>;
+		stashSave: (
+			projectPath: string,
+			message?: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		stashPop: (
+			projectPath: string,
+			index?: number,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		stashApply: (
+			projectPath: string,
+			index?: number,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		stashDrop: (
+			projectPath: string,
+			index?: number,
+		) => Promise<import("../../shared/types").GitActionResult>;
 	};
 	updater: {
 		check: () => Promise<string | null>;

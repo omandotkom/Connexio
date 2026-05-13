@@ -206,6 +206,12 @@ export interface GitBranchEntry {
 	remote: boolean;
 }
 
+// Git stash entry
+export interface GitStashEntry {
+	index: number;
+	message: string;
+}
+
 // Notifications
 export type NotificationSource = "agent" | "command" | "system";
 
