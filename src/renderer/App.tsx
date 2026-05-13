@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import AppFooter from "./components/AppFooter";
 import NotificationToast from "./components/NotificationToast";
 import SettingsModal from "./components/SettingsModal";
 import Sidebar from "./components/Sidebar";
@@ -60,6 +61,7 @@ export default function App() {
 					{activeProjectId ? <Workspace /> : <WelcomeScreen />}
 				</div>
 			</div>
+			<AppFooter />
 
 			{/* Settings Modal */}
 			{isSettingsOpen && <SettingsModal />}
