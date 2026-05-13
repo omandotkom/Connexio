@@ -652,11 +652,13 @@ function AboutSettings() {
 					Connexio is free and open source. If you find it useful, consider supporting development.
 				</p>
 				<div className="flex flex-col items-center gap-2 p-4 bg-connexio-bg-tertiary rounded-lg border border-connexio-border">
-					<img
-						src={new URL("../assets/download.png", import.meta.url).href}
-						alt="Donate QR Code"
-						className="w-40 h-40 rounded-md"
-					/>
+					<div className="bg-white p-2 rounded-md">
+						<img
+							src={new URL("../assets/download.png", import.meta.url).href}
+							alt="Donate QR Code"
+							className="w-40 h-40 rounded-sm"
+						/>
+					</div>
 					<p className="text-[10px] text-connexio-text-muted text-center">
 						Scan to donate
 					</p>
