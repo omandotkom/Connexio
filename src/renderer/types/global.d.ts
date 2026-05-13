@@ -108,6 +108,17 @@ interface ConnexioAPI {
 		unstageAll: (projectPath: string) => Promise<boolean>;
 		discard: (projectPath: string, filePath: string) => Promise<boolean>;
 		openFile: (projectPath: string, filePath: string) => Promise<boolean>;
+		commit: (
+			projectPath: string,
+			message: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		push: (
+			projectPath: string,
+		) => Promise<import("../../shared/types").GitActionResult>;
+		history: (
+			projectPath: string,
+			limit?: number,
+		) => Promise<import("../../shared/types").GitCommitEntry[]>;
 	};
 	updater: {
 		check: () => Promise<string | null>;

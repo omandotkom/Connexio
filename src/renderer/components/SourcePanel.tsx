@@ -30,6 +30,8 @@ import type { GitChangedFile, GitDiffResult } from "../../shared/types";
 import ConfirmDialog from "./ConfirmDialog";
 import DiffModal, { type DiffFileContext } from "./DiffModal";
 import DiffViewer from "./DiffViewer";
+import CommitBox from "./git/CommitBox";
+import GitHistoryPanel from "./git/GitHistoryPanel";
 import GitStatusBar from "./GitStatusBar";
 
 interface Props {
@@ -551,6 +553,7 @@ export default function SourcePanel({ projectPath }: Props) {
 	const [showFilter, setShowFilter] = useState(false);
 	const [message, setMessage] = useState<SourceMessage | null>(null);
 	const [globalActionLoading, setGlobalActionLoading] = useState<string | null>(null);
+	const [activeTab, setActiveTab] = useState<"changes" | "history">("changes");
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const mountedRef = useRef(true);
 	const activeProjectPathRef = useRef(projectPath);
@@ -902,19 +905,61 @@ export default function SourcePanel({ projectPath }: Props) {
 	return (
 		<>
 			<div className="flex flex-col h-full">
-				{/* Git status bar — only active when this panel is mounted */}
+				{/* Git status bar */}
 				<div className="px-3 py-1.5 border-b border-connexio-border">
 					<GitStatusBar projectPath={projectPath} />
 				</div>
 
-				<div className="flex items-center gap-1 px-3 py-2 border-b border-connexio-border">
-					<span className="text-[10px] font-semibold text-connexio-text-secondary uppercase tracking-wider flex-1">
+				{/* Tab switcher: Changes / History */}
+				<div className="flex items-center border-b border-connexio-border">
+					<button
+						onClick={() => setActiveTab("changes")}
+						className={`flex-1 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+							activeTab === "changes"
+								? "text-connexio-accent border-b-2 border-connexio-accent"
+								: "text-connexio-text-muted hover:text-connexio-text-secondary"
+						}`}
+						type="button"
+					>
 						Changes
 						{totalChanges > 0 && (
-							<span className="ml-1 text-connexio-accent">
-								({totalChanges})
-							</span>
+							<span className="ml-1 text-connexio-accent/70">({totalChanges})</span>
 						)}
+					</button>
+					<button
+						onClick={() => setActiveTab("history")}
+						className={`flex-1 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+							activeTab === "history"
+								? "text-connexio-accent border-b-2 border-connexio-accent"
+								: "text-connexio-text-muted hover:text-connexio-text-secondary"
+						}`}
+						type="button"
+					>
+						History
+					</button>
+				</div>
+
+				{/* History tab */}
+				{activeTab === "history" && (
+					<GitHistoryPanel projectPath={projectPath} />
+				)}
+
+				{/* Changes tab */}
+				{activeTab === "changes" && (
+					<>
+						{/* Commit box */}
+						<CommitBox
+							projectPath={projectPath}
+							stagedCount={grouped.staged.length}
+							onMessage={showMessage}
+							onRefresh={handleRefresh}
+						/>
+
+				<div className="flex items-center gap-1 px-3 py-1.5 border-b border-connexio-border">
+					<span className="text-[10px] text-connexio-text-muted flex-1">
+						{filteredTotal !== totalChanges && filterQuery
+							? `${filteredTotal} of ${totalChanges} files`
+							: `${totalChanges} file${totalChanges !== 1 ? "s" : ""}`}
 					</span>
 					<button
 						onClick={() => {
@@ -1076,6 +1121,8 @@ export default function SourcePanel({ projectPath }: Props) {
 						</>
 					)}
 				</div>
+					</>
+				)}
 			</div>
 
 			{modalOpen && modalFiles.length > 0 && (

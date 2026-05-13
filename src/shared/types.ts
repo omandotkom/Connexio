@@ -183,6 +183,22 @@ export interface GitDiffLine {
 	newLineNo?: number;
 }
 
+// Git action result (commit, push, etc.)
+export interface GitActionResult {
+	success: boolean;
+	message: string;
+	output?: string;
+}
+
+// Git commit history entry
+export interface GitCommitEntry {
+	shortHash: string;
+	hash: string;
+	author: string;
+	relativeTime: string;
+	subject: string;
+}
+
 // Notifications
 export type NotificationSource = "agent" | "command" | "system";
 

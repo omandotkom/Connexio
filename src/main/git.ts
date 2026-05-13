@@ -4,7 +4,9 @@ import fs from "fs";
 import path from "path";
 import { promisify } from "util";
 import type {
+	GitActionResult,
 	GitChangedFile,
+	GitCommitEntry,
 	GitDiffHunk,
 	GitDiffLine,
 	GitDiffResult,
@@ -778,6 +780,126 @@ async function getCachedChangedFiles(
 }
 
 // ============================================
+// Commit, Push, History
+// ============================================
+
+async function gitCommit(
+	projectPath: string,
+	message: string,
+): Promise<GitActionResult> {
+	if (!message.trim()) {
+		return { success: false, message: "Commit message cannot be empty" };
+	}
+	try {
+		const { stdout, stderr } = await execFileAsync(
+			"git",
+			["commit", "-m", message],
+			{
+				cwd: projectPath,
+				timeout: 30000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		return {
+			success: true,
+			message: "Committed successfully",
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Commit failed";
+		// Common error patterns
+		if (errMsg.includes("nothing to commit")) {
+			return { success: false, message: "Nothing to commit" };
+		}
+		if (errMsg.includes("Please tell me who you are")) {
+			return {
+				success: false,
+				message: "Git user.name and user.email not configured",
+			};
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Commit failed" };
+	}
+}
+
+async function gitPush(projectPath: string): Promise<GitActionResult> {
+	try {
+		const { stdout, stderr } = await execFileAsync("git", ["push"], {
+			cwd: projectPath,
+			timeout: 60000,
+			windowsHide: true,
+			maxBuffer: 5 * 1024 * 1024,
+		});
+		return {
+			success: true,
+			message: "Pushed successfully",
+			output: stdout || stderr,
+		};
+	} catch (err: unknown) {
+		const e = err as { stderr?: string; message?: string };
+		const errMsg = e.stderr || e.message || "Push failed";
+		if (errMsg.includes("no upstream branch") || errMsg.includes("has no upstream")) {
+			return {
+				success: false,
+				message: "No upstream branch. Use terminal to set upstream.",
+			};
+		}
+		if (errMsg.includes("rejected")) {
+			return {
+				success: false,
+				message: "Push rejected. Pull remote changes first.",
+			};
+		}
+		if (errMsg.includes("Authentication") || errMsg.includes("fatal: could not read")) {
+			return {
+				success: false,
+				message: "Authentication failed. Check credentials.",
+			};
+		}
+		return { success: false, message: errMsg.split("\n")[0] || "Push failed" };
+	}
+}
+
+async function gitHistory(
+	projectPath: string,
+	limit = 50,
+): Promise<GitCommitEntry[]> {
+	const SEP = "\x1f"; // unit separator
+	const format = `%h${SEP}%H${SEP}%an${SEP}%ar${SEP}%s`;
+	try {
+		const { stdout } = await execFileAsync(
+			"git",
+			["log", `--pretty=format:${format}`, `-n`, String(limit)],
+			{
+				cwd: projectPath,
+				timeout: 10000,
+				windowsHide: true,
+				maxBuffer: 5 * 1024 * 1024,
+			},
+		);
+		if (!stdout.trim()) return [];
+		return stdout
+			.trim()
+			.split("\n")
+			.map((line) => {
+				const [shortHash, hash, author, relativeTime, ...subjectParts] =
+					line.split(SEP);
+				return {
+					shortHash: shortHash || "",
+					hash: hash || "",
+					author: author || "",
+					relativeTime: relativeTime || "",
+					subject: subjectParts.join(SEP) || "",
+				};
+			})
+			.filter((e) => e.shortHash);
+	} catch {
+		return [];
+	}
+}
+
+// ============================================
 // IPC Setup
 // ============================================
 
@@ -853,6 +975,28 @@ export function setupGitIPC() {
 			} catch {
 				return false;
 			}
+		},
+	);
+
+	ipcMain.handle(
+		"git:commit",
+		async (_event, projectPath: string, message: string) => {
+			const result = await gitCommit(projectPath, message);
+			if (result.success) invalidateStatusCaches(projectPath);
+			return result;
+		},
+	);
+
+	ipcMain.handle("git:push", async (_event, projectPath: string) => {
+		const result = await gitPush(projectPath);
+		if (result.success) invalidateStatusCaches(projectPath);
+		return result;
+	});
+
+	ipcMain.handle(
+		"git:history",
+		async (_event, projectPath: string, limit?: number) => {
+			return gitHistory(projectPath, limit);
 		},
 	);
 

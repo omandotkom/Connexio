@@ -118,6 +118,12 @@ contextBridge.exposeInMainWorld("connexio", {
 			ipcRenderer.invoke("git:discard", projectPath, filePath),
 		openFile: (projectPath: string, filePath: string) =>
 			ipcRenderer.invoke("git:open-file", projectPath, filePath),
+		commit: (projectPath: string, message: string) =>
+			ipcRenderer.invoke("git:commit", projectPath, message),
+		push: (projectPath: string) =>
+			ipcRenderer.invoke("git:push", projectPath),
+		history: (projectPath: string, limit?: number) =>
+			ipcRenderer.invoke("git:history", projectPath, limit),
 	},
 
 	updater: {
