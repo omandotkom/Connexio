@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
+import { SplitTerminalArea } from "./panes";
 import ShellPicker from "./ShellPicker";
 import SourcePanel from "./SourcePanel";
 import SSHPanel from "./SSHPanel";
@@ -279,9 +280,13 @@ export default function Workspace() {
 
 			{/* Main content area */}
 			<div className="flex flex-1 overflow-hidden">
-				{/* Terminal Area */}
+				{/* Terminal Area — split panes + background terminals */}
 				<div className="flex-1 relative overflow-hidden">
-					<TerminalLayer />
+					<SplitTerminalArea />
+					{/* Hidden terminals for non-active tabs (keep alive) */}
+					<div className="hidden">
+						<TerminalLayer />
+					</div>
 				</div>
 
 				{/* Right Side Panel */}
