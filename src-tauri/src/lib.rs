@@ -123,6 +123,9 @@ pub fn run() {
             modules::notification::notification_upload_sound,
             modules::notification::notification_remove_custom_sound,
             modules::notification::notification_get_sound_path,
+            // Explorer
+            modules::explorer::explorer_list_dir,
+            modules::explorer::explorer_read_tree,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

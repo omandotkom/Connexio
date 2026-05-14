@@ -1,8 +1,9 @@
-import { GitBranch, ListTodo, PanelRightClose, Server } from "lucide-react";
+import { FolderTree, GitBranch, ListTodo, PanelRightClose, Server } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
+import { FileExplorer } from "./explorer";
 import ShellPicker from "./ShellPicker";
 import SourcePanel from "./SourcePanel";
 import SSHPanel from "./SSHPanel";
@@ -10,7 +11,7 @@ import TaskPanel from "./TaskPanel";
 import TerminalLayer from "./TerminalLayer";
 import WorkspaceTab from "./WorkspaceTab";
 
-type SidePanelTab = "tasks" | "ssh" | "source";
+type SidePanelTab = "explorer" | "tasks" | "ssh" | "source";
 
 export default function Workspace() {
 	const {
@@ -79,7 +80,7 @@ export default function Workspace() {
 			const detail = (e as CustomEvent).detail;
 			if (detail === "close") {
 				setShowSidePanel(false);
-			} else if (detail === "source" || detail === "tasks" || detail === "ssh") {
+			} else if (detail === "explorer" || detail === "source" || detail === "tasks" || detail === "ssh") {
 				setSidePanelTab(detail as SidePanelTab);
 				setShowSidePanel(true);
 			}
@@ -199,6 +200,18 @@ export default function Workspace() {
 				{/* Side panel toggles */}
 				<div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
 					<button
+						onClick={() => toggleSidePanel("explorer")}
+						className={`p-1 rounded transition-colors ${
+							showSidePanel && sidePanelTab === "explorer"
+								? "bg-connexio-accent/10 text-connexio-accent"
+								: "hover:bg-connexio-bg-tertiary text-connexio-text-muted"
+						}`}
+						title="File Explorer"
+						type="button"
+					>
+						<FolderTree size={12} />
+					</button>
+					<button
 						onClick={() => toggleSidePanel("source")}
 						className={`p-1 rounded transition-colors ${
 							showSidePanel && sidePanelTab === "source"
@@ -289,10 +302,10 @@ export default function Workspace() {
 					<div
 						ref={panelRef}
 						className="bg-connexio-bg-secondary border-l border-connexio-border flex flex-col relative"
-						style={{ width: sidePanelTab === "source" ? panelWidth : 240 }}
+						style={{ width: sidePanelTab === "source" || sidePanelTab === "explorer" ? panelWidth : 240 }}
 					>
-						{/* Resize handle (only for source panel) */}
-						{sidePanelTab === "source" && (
+						{/* Resize handle */}
+						{(sidePanelTab === "source" || sidePanelTab === "explorer") && (
 							<div
 								className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-connexio-accent/30 active:bg-connexio-accent/50 transition-colors z-10"
 								onMouseDown={handleResizeStart}
@@ -300,6 +313,18 @@ export default function Workspace() {
 						)}
 						{/* Panel header with tabs */}
 						<div className="flex items-center border-b border-connexio-border">
+							<button
+								onClick={() => setSidePanelTab("explorer")}
+								className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+									sidePanelTab === "explorer"
+										? "text-connexio-accent border-b-2 border-connexio-accent"
+										: "text-connexio-text-muted hover:text-connexio-text-secondary"
+								}`}
+								type="button"
+							>
+								<FolderTree size={10} />
+								Files
+							</button>
 							<button
 								onClick={() => setSidePanelTab("source")}
 								className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
@@ -349,6 +374,14 @@ export default function Workspace() {
 						</div>
 
 						{/* Panel content */}
+						{sidePanelTab === "explorer" && (
+							<FileExplorer
+								projectPath={project.path}
+								onOpenInTerminal={(path) => {
+									openTerminalTab(activeProjectId, `Terminal (${path.split(/[\\/]/).pop()})`);
+								}}
+							/>
+						)}
 						{sidePanelTab === "source" && (
 							<SourcePanel projectPath={project.path} />
 						)}

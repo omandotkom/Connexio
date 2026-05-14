@@ -11,3 +11,4 @@ pub mod pinned;
 pub mod ssh;
 pub mod updater;
 pub mod notification;
+pub mod explorer;
