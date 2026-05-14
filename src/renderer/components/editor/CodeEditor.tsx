@@ -68,11 +68,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 			return;
 		}
 		const content = view.state.doc.toString();
-		if (content === originalContentRef.current) {
-			setSaveStatus("No changes");
-			setTimeout(() => setSaveStatus(null), 1500);
-			return;
-		}
+		console.log("[Editor] Save called, content length:", content.length, "original length:", originalContentRef.current.length, "same:", content === originalContentRef.current);
 		setSaving(true);
 		setError(null);
 		try {
@@ -106,11 +102,18 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 	// Load file and create editor
 	useEffect(() => {
 		if (!containerRef.current) return;
-		let view: EditorView | null = null;
+		// Clear any existing editor first
+		if (viewRef.current) {
+			viewRef.current.destroy();
+			viewRef.current = null;
+		}
+		containerRef.current.innerHTML = "";
+
+		let destroyed = false;
 
 		invoke<string>("explorer_read_file", { filePath })
 			.then((content) => {
-				if (!containerRef.current) return;
+				if (destroyed || !containerRef.current) return;
 				originalContentRef.current = content;
 
 				const state = EditorState.create({
@@ -125,20 +128,23 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						connexioDarkTheme,
 						EditorView.updateListener.of((update) => {
 							if (update.docChanged) {
-								const current = update.state.doc.toString();
-								setIsDirty(current !== originalContentRef.current);
+								setIsDirty(true);
 							}
 						}),
 					],
 				});
 
-				view = new EditorView({ state, parent: containerRef.current });
+				const view = new EditorView({ state, parent: containerRef.current });
 				viewRef.current = view;
 			})
 			.catch((e) => setError(String(e)));
 
 		return () => {
-			if (view) { view.destroy(); viewRef.current = null; }
+			destroyed = true;
+			if (viewRef.current) {
+				viewRef.current.destroy();
+				viewRef.current = null;
+			}
 		};
 	}, [filePath]);
 
