@@ -46,6 +46,7 @@ pub fn terminal_create(
     shell: Option<String>,
     context: Option<TerminalContext>,
 ) -> Result<String, String> {
+    log::info!("terminal_create: path={}, shell={:?}", project_path, shell);
     let state = app.state::<PtyManager>();
 
     let id = {

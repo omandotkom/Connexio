@@ -88,7 +88,9 @@ export const project = {
 
 	selectDir: async (): Promise<string | null> => {
 		const selected = await open({ directory: true, multiple: false });
-		return selected as string | null;
+		if (!selected) return null;
+		if (Array.isArray(selected)) return selected[0] || null;
+		return selected;
 	},
 };
 

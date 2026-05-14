@@ -91,6 +91,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		await window.connexio.project.add(project);
 		const projects = await window.connexio.project.list();
 		set({ projects });
+
+		// Auto-activate the new project and open terminal
+		get().setActiveProject(project.id);
 	},
 
 	deleteProject: async (id: string) => {
@@ -213,16 +216,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		const tabLabel = label || `Terminal ${existingTabs.length + 1}`;
 
 		const newTabId = uuid();
-		const terminalId = await window.connexio.terminal.create(
-			project.path,
-			shell,
-			{
-				projectId,
-				projectName: project.name,
-				tabId: newTabId,
-				tabLabel,
-			},
-		);
+		let terminalId: string;
+		try {
+			terminalId = await window.connexio.terminal.create(
+				project.path,
+				shell,
+				{
+					projectId,
+					projectName: project.name,
+					tabId: newTabId,
+					tabLabel,
+				},
+			);
+		} catch (e) {
+			console.error("[Connexio] Failed to create terminal:", e);
+			return;
+		}
 
 		const newTab: TerminalTab = {
 			id: newTabId,
