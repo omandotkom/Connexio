@@ -1,4 +1,4 @@
-import { Bot, FolderTree, GitBranch, ListTodo, PanelRightClose, Server } from "lucide-react";
+import { Bot, FolderTree, GitBranch, Globe, ListTodo, PanelRightClose, Server } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { AIChatPanel } from "./ai";
@@ -11,6 +11,7 @@ import SourcePanel from "./SourcePanel";
 import SSHPanel from "./SSHPanel";
 import TaskPanel from "./TaskPanel";
 import TerminalLayer from "./TerminalLayer";
+import WebPreview from "./WebPreview";
 import WorkspaceTab from "./WorkspaceTab";
 
 type SidePanelTab = "ai" | "explorer" | "tasks" | "ssh" | "source";
@@ -38,6 +39,7 @@ export default function Workspace() {
 		null,
 	);
 	const [editorFile, setEditorFile] = useState<string | null>(null);
+	const [showPreview, setShowPreview] = useState(false);
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
 	// Resizable side panel
@@ -200,6 +202,20 @@ export default function Workspace() {
 					<CommandTimer terminalId={activeTab.terminalId} />
 				)}
 
+				{/* Web Preview toggle */}
+				<button
+					onClick={() => setShowPreview(!showPreview)}
+					className={`p-1 rounded transition-colors ${
+						showPreview
+							? "bg-connexio-accent/10 text-connexio-accent"
+							: "hover:bg-connexio-bg-tertiary text-connexio-text-muted"
+					}`}
+					title="Web Preview"
+					type="button"
+				>
+					<Globe size={12} />
+				</button>
+
 				{/* Side panel toggles */}
 				<div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
 					<button
@@ -307,9 +323,11 @@ export default function Workspace() {
 
 			{/* Main content area */}
 			<div className="flex flex-1 overflow-hidden">
-				{/* Terminal / Editor Area */}
+				{/* Terminal / Editor / Preview Area */}
 				<div className="flex-1 relative overflow-hidden flex flex-col">
-					{editorFile ? (
+					{showPreview ? (
+						<WebPreview onClose={() => setShowPreview(false)} />
+					) : editorFile ? (
 						<CodeEditor
 							filePath={editorFile}
 							onClose={() => setEditorFile(null)}
