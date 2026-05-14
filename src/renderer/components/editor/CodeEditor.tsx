@@ -81,25 +81,44 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 	const [isDirty, setIsDirty] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [saveStatus, setSaveStatus] = useState<string | null>(null);
 	const originalContentRef = useRef("");
-	const saveRef = useRef<() => void>(() => {});
+	const filePathRef = useRef(filePath);
+	filePathRef.current = filePath;
 
 	const fileName = filePath.replace(/\\/g, "/").split("/").pop() || "untitled";
 
-	// Save function (ref to avoid stale closure in keymap)
-	saveRef.current = async () => {
-		if (!viewRef.current || saving) return;
+	// Save function
+	const doSave = async () => {
+		if (!viewRef.current) return;
 		const content = viewRef.current.state.doc.toString();
+		if (content === originalContentRef.current) return; // nothing to save
 		setSaving(true);
+		setError(null);
 		try {
-			await invoke("explorer_write_file", { filePath, content });
+			await invoke("explorer_write_file", { filePath: filePathRef.current, content });
 			originalContentRef.current = content;
 			setIsDirty(false);
+			setSaveStatus("Saved");
+			setTimeout(() => setSaveStatus(null), 2000);
 		} catch (e) {
 			setError(String(e));
 		}
 		setSaving(false);
 	};
+
+	// Global Ctrl+S handler (prevents browser default + triggers save)
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+				e.preventDefault();
+				e.stopPropagation();
+				doSave();
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown, true);
+		return () => window.removeEventListener("keydown", handleKeyDown, true);
+	}, []);
 
 	// Load file and create editor
 	useEffect(() => {
@@ -123,13 +142,6 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 							...defaultKeymap,
 							...historyKeymap,
 							indentWithTab,
-							{
-								key: "Mod-s",
-								run: () => {
-									saveRef.current();
-									return true;
-								},
-							},
 						]),
 						getLanguageExtension(filePath),
 						connexioDarkTheme,
@@ -160,7 +172,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		};
 	}, [filePath]);
 
-	const handleSave = () => saveRef.current();
+	const handleSave = () => doSave();
 
 	return (
 		<div className="flex flex-col h-full">
@@ -173,6 +185,9 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 					{isDirty && (
 						<span className="w-2 h-2 rounded-full bg-connexio-accent" title="Unsaved changes" />
 					)}
+					{saveStatus && (
+						<span className="text-[10px] text-green-400">{saveStatus}</span>
+					)}
 				</div>
 				<div className="flex items-center gap-1">
 					<button
@@ -183,7 +198,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						type="button"
 					>
 						<Save size={10} />
-						Save
+						{saving ? "Saving..." : "Save"}
 					</button>
 					<button
 						onClick={onClose}
