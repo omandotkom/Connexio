@@ -10,3 +10,4 @@ pub mod session;
 pub mod pinned;
 pub mod ssh;
 pub mod updater;
+pub mod notification;

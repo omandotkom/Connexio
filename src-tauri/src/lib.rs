@@ -1,5 +1,6 @@
 mod modules;
 
+use modules::notification::NotificationState;
 use modules::pty::PtyManager;
 use tauri::Manager;
 
@@ -23,6 +24,10 @@ pub fn run() {
         .setup(|app| {
             // Initialize PTY manager state
             app.manage(PtyManager::new());
+            app.manage(NotificationState::new());
+
+            // Start notification TCP server
+            modules::notification::start_notification_server(&app.handle());
 
             // Show window after setup
             if let Some(window) = app.get_webview_window("main") {
@@ -102,6 +107,22 @@ pub fn run() {
             modules::updater::updater_check,
             modules::updater::updater_download,
             modules::updater::updater_install,
+            // Notification
+            modules::notification::notification_list,
+            modules::notification::notification_unread_count,
+            modules::notification::notification_mark_read,
+            modules::notification::notification_mark_all_read,
+            modules::notification::notification_remove,
+            modules::notification::notification_clear,
+            modules::notification::notification_get_settings,
+            modules::notification::notification_update_settings,
+            modules::notification::notification_get_port,
+            modules::notification::notification_get_providers,
+            modules::notification::notification_install_hook,
+            modules::notification::notification_uninstall_hook,
+            modules::notification::notification_upload_sound,
+            modules::notification::notification_remove_custom_sound,
+            modules::notification::notification_get_sound_path,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

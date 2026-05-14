@@ -92,6 +92,13 @@ pub fn terminal_create(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Connexio");
+
+    // Inject notification server port for AI agent hooks
+    if let Some(notif_state) = app.try_state::<crate::modules::notification::NotificationState>() {
+        if let Some(port) = *notif_state.server_port.lock().unwrap() {
+            cmd.env("CONNEXIO_NOTIFICATION_PORT", format!("{}", port));
+        }
+    }
     if let Some(ref ctx) = context {
         cmd.env("CONNEXIO_PROJECT_ID", &ctx.project_id);
         cmd.env("CONNEXIO_PROJECT_NAME", &ctx.project_name);
