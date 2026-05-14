@@ -133,7 +133,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 	},
 
 	setActiveProject: (id: string) => {
-		const { activeProjectId, projects } = get();
+		const { activeProjectId, projects, isRestoring } = get();
 		if (activeProjectId === id) return;
 
 		const project = projects.find((p) => p.id === id);
@@ -142,9 +142,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		set({ activeProjectId: id });
 
 		// Auto-open first terminal tab if workspace is empty
-		const tabs = get().workspaceTabs[id];
-		if (!tabs || tabs.length === 0) {
-			get().openTerminalTab(id, "Terminal 1");
+		// But skip during restore — restoreWorkspace handles its own terminals
+		if (!isRestoring) {
+			const tabs = get().workspaceTabs[id];
+			if (!tabs || tabs.length === 0) {
+				get().openTerminalTab(id, "Terminal 1");
+			}
 		}
 
 		get().updateProjectLastOpened(id);

@@ -37,9 +37,19 @@ interface TerminalContext {
 type TerminalDataCallback = (id: string, data: string) => void;
 const terminalDataListeners = new Set<TerminalDataCallback>();
 
+// Buffer data for terminals that don't have listeners yet
+const terminalDataBuffer = new Map<string, string[]>();
+
 // Start global listener immediately (not lazy)
 listen<[string, string]>("terminal:data", (event) => {
 	const [id, data] = event.payload;
+	if (terminalDataListeners.size === 0) {
+		// No listeners yet, buffer everything
+		const buf = terminalDataBuffer.get(id) || [];
+		buf.push(data);
+		terminalDataBuffer.set(id, buf);
+		return;
+	}
 	for (const cb of terminalDataListeners) {
 		cb(id, data);
 	}
@@ -66,6 +76,15 @@ export const terminal = {
 
 	onData: (callback: (id: string, data: string) => void): (() => void) => {
 		terminalDataListeners.add(callback);
+		// Flush any buffered data to this new listener
+		if (terminalDataBuffer.size > 0) {
+			for (const [id, chunks] of terminalDataBuffer.entries()) {
+				for (const data of chunks) {
+					callback(id, data);
+				}
+			}
+			terminalDataBuffer.clear();
+		}
 		return () => {
 			terminalDataListeners.delete(callback);
 		};
