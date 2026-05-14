@@ -1,90 +1,110 @@
-import {
-	Columns2,
-	Rows2,
-	X,
-} from "lucide-react";
-import { useEffect } from "react";
+import { Columns2, Rows2, X } from "lucide-react";
 import { useProjectStore } from "../../stores/projectStore";
 import { usePaneStore } from "../../stores/paneStore";
 import SplitPane from "./SplitPane";
 
+interface Props {
+	projectId: string;
+	terminalId: string;
+	tabId: string;
+}
+
 /**
- * Renders the split pane terminal area for the active project.
- * Falls back to single terminal if no split is configured.
+ * Wraps a terminal tab with split pane capability.
+ * When not split, renders nothing (terminal rendered by TerminalLayer).
+ * When split, renders the pane tree with multiple terminals.
  */
-export default function SplitTerminalArea() {
-	const { activeProjectId, workspaceTabs, activeTabIds } = useProjectStore();
+export default function SplitTerminalArea({ projectId, terminalId, tabId }: Props) {
 	const {
 		paneTrees,
 		activePaneIds,
-		initPane,
 		splitPane,
 		closePane,
 		setActivePane,
 		getActivePaneTerminalId,
+		initPane,
 	} = usePaneStore();
 
-	// Initialize pane tree when active tab changes
-	useEffect(() => {
-		if (!activeProjectId) return;
-		const tabs = workspaceTabs[activeProjectId] || [];
-		const activeTabId = activeTabIds[activeProjectId];
-		const activeTab = tabs.find((t) => t.id === activeTabId);
+	const tree = paneTrees[`${projectId}:${tabId}`];
+	const activePaneId = activePaneIds[`${projectId}:${tabId}`] || null;
+	const key = `${projectId}:${tabId}`;
 
-		if (activeTab?.terminalId && !paneTrees[activeProjectId]) {
-			initPane(activeProjectId, activeTab.terminalId, activeTab.id);
-		}
-	}, [activeProjectId, workspaceTabs, activeTabIds]);
+	// If no split exists, just show split buttons overlay
+	if (!tree) {
+		return (
+			<div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
+				<button
+					onClick={() => handleSplit("horizontal")}
+					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
+					title="Split Right (Ctrl+Shift+D)"
+					type="button"
+				>
+					<Columns2 size={12} className="text-connexio-text-muted" />
+				</button>
+				<button
+					onClick={() => handleSplit("vertical")}
+					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
+					title="Split Down"
+					type="button"
+				>
+					<Rows2 size={12} className="text-connexio-text-muted" />
+				</button>
+			</div>
+		);
+	}
 
-	if (!activeProjectId) return null;
+	// Split exists — render pane tree (this takes over the full area)
+	const canClose = tree.type === "split";
 
-	const tree = paneTrees[activeProjectId];
-	const activePaneId = activePaneIds[activeProjectId] || null;
-
-	// If no pane tree yet, show nothing (will init on next render)
-	if (!tree) return null;
-
-	const handleSplit = async (direction: "horizontal" | "vertical") => {
-		if (!activeProjectId || !activePaneId) return;
-
-		// Create a new terminal for the split
+	async function handleSplit(direction: "horizontal" | "vertical") {
 		const { projects } = useProjectStore.getState();
-		const project = projects.find((p) => p.id === activeProjectId);
+		const project = projects.find((p) => p.id === projectId);
 		if (!project) return;
 
 		try {
-			const tabId = crypto.randomUUID();
-			const terminalId = await window.connexio.terminal.create(
+			const newTabId = crypto.randomUUID();
+			const newTerminalId = await window.connexio.terminal.create(
 				project.path,
 				undefined,
 				{
-					projectId: activeProjectId,
+					projectId,
 					projectName: project.name,
-					tabId,
-					tabLabel: `Split`,
+					tabId: newTabId,
+					tabLabel: "Split",
 				},
 			);
-			splitPane(activeProjectId, activePaneId, direction, terminalId, tabId);
+
+			if (!paneTrees[key]) {
+				// First split — init tree with current terminal, then split
+				initPane(key, terminalId, tabId);
+				// Need to wait for state update
+				setTimeout(() => {
+					const { paneTrees: trees, activePaneIds: ids } = usePaneStore.getState();
+					const currentTree = trees[key];
+					if (currentTree) {
+						splitPane(key, currentTree.id, direction, newTerminalId, newTabId);
+					}
+				}, 0);
+			} else {
+				const targetPaneId = activePaneId || tree.id;
+				splitPane(key, targetPaneId, direction, newTerminalId, newTabId);
+			}
 		} catch (e) {
-			console.error("[Connexio] Failed to create split terminal:", e);
+			console.error("[Connexio] Failed to split terminal:", e);
 		}
-	};
+	}
 
-	const handleClosePane = () => {
-		if (!activeProjectId || !activePaneId) return;
-		// Get terminal ID before closing to kill it
-		const terminalId = getActivePaneTerminalId(activeProjectId);
-		closePane(activeProjectId, activePaneId);
-		if (terminalId) {
-			window.connexio.terminal.close(terminalId);
+	function handleClosePane() {
+		if (!activePaneId) return;
+		const tid = getActivePaneTerminalId(key);
+		closePane(key, activePaneId);
+		if (tid) {
+			window.connexio.terminal.close(tid);
 		}
-	};
-
-	// Check if we can close (more than one pane)
-	const canClose = tree.type === "split";
+	}
 
 	return (
-		<div className="relative w-full h-full flex flex-col">
+		<div className="absolute inset-0 z-10 flex flex-col">
 			{/* Split controls */}
 			<div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
 				<button
@@ -116,12 +136,11 @@ export default function SplitTerminalArea() {
 			</div>
 
 			{/* Pane tree */}
-			<div className="flex-1 overflow-hidden">
+			<div className="flex-1">
 				<SplitPane
 					node={tree}
-					activeProjectId={activeProjectId}
 					activePaneId={activePaneId}
-					onPaneSelect={(id) => setActivePane(activeProjectId, id)}
+					onPaneSelect={(id) => setActivePane(key, id)}
 				/>
 			</div>
 		</div>

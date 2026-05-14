@@ -1,5 +1,4 @@
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { useProjectStore } from "../../stores/projectStore";
+import { Group, Panel, Separator } from "react-resizable-panels";
 import Terminal from "../Terminal";
 
 export type PaneDirection = "horizontal" | "vertical";
@@ -9,7 +8,6 @@ export interface PaneNode {
 	type: "terminal" | "split";
 	// For terminal panes
 	terminalId?: string;
-	tabId?: string;
 	// For split panes
 	direction?: PaneDirection;
 	children?: PaneNode[];
@@ -17,14 +15,12 @@ export interface PaneNode {
 
 interface SplitPaneProps {
 	node: PaneNode;
-	activeProjectId: string;
 	activePaneId: string | null;
 	onPaneSelect: (paneId: string) => void;
 }
 
 export default function SplitPane({
 	node,
-	activeProjectId,
 	activePaneId,
 	onPaneSelect,
 }: SplitPaneProps) {
@@ -32,7 +28,7 @@ export default function SplitPane({
 		const isActive = activePaneId === node.id;
 		return (
 			<div
-				className={`relative w-full h-full ${isActive ? "ring-1 ring-connexio-accent/40" : ""}`}
+				className={`relative w-full h-full ${isActive ? "ring-1 ring-inset ring-connexio-accent/40" : ""}`}
 				onClick={() => onPaneSelect(node.id)}
 				onKeyDown={() => {}}
 			>
@@ -44,33 +40,32 @@ export default function SplitPane({
 	}
 
 	if (node.type === "split" && node.children && node.children.length > 0) {
-		const direction = node.direction === "vertical" ? "vertical" : "horizontal";
+		const orientation = node.direction === "vertical" ? "vertical" : "horizontal";
 
 		return (
-			<PanelGroup direction={direction} className="w-full h-full">
+			<Group orientation={orientation} className="w-full h-full">
 				{node.children.map((child, index) => (
 					<>
 						{index > 0 && (
-							<PanelResizeHandle
-								key={`handle-${child.id}`}
+							<Separator
+								key={`sep-${child.id}`}
 								className={`${
-									direction === "horizontal"
+									orientation === "horizontal"
 										? "w-[3px] hover:bg-connexio-accent/40 active:bg-connexio-accent/60"
 										: "h-[3px] hover:bg-connexio-accent/40 active:bg-connexio-accent/60"
 								} bg-connexio-border transition-colors`}
 							/>
 						)}
-						<Panel key={child.id} minSize={15}>
+						<Panel key={child.id} minSize="15%">
 							<SplitPane
 								node={child}
-								activeProjectId={activeProjectId}
 								activePaneId={activePaneId}
 								onPaneSelect={onPaneSelect}
 							/>
 						</Panel>
 					</>
 				))}
-			</PanelGroup>
+			</Group>
 		);
 	}
 
