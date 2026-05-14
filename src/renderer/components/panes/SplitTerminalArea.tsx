@@ -32,22 +32,22 @@ export default function SplitTerminalArea({ projectId, terminalId, tabId }: Prop
 	// If no split exists, just show split buttons overlay
 	if (!tree) {
 		return (
-			<div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
+			<div className="absolute top-1 right-1 z-50 flex items-center gap-0.5">
 				<button
 					onClick={() => handleSplit("horizontal")}
-					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
-					title="Split Right (Ctrl+Shift+D)"
+					className="p-1 rounded bg-connexio-bg-secondary border border-connexio-border hover:bg-connexio-accent/20 hover:border-connexio-accent/40 transition-colors"
+					title="Split Right"
 					type="button"
 				>
-					<Columns2 size={12} className="text-connexio-text-muted" />
+					<Columns2 size={12} className="text-connexio-text-secondary" />
 				</button>
 				<button
 					onClick={() => handleSplit("vertical")}
-					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
+					className="p-1 rounded bg-connexio-bg-secondary border border-connexio-border hover:bg-connexio-accent/20 hover:border-connexio-accent/40 transition-colors"
 					title="Split Down"
 					type="button"
 				>
-					<Rows2 size={12} className="text-connexio-text-muted" />
+					<Rows2 size={12} className="text-connexio-text-secondary" />
 				</button>
 			</div>
 		);
@@ -106,31 +106,31 @@ export default function SplitTerminalArea({ projectId, terminalId, tabId }: Prop
 	return (
 		<div className="absolute inset-0 z-10 flex flex-col">
 			{/* Split controls */}
-			<div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity">
+			<div className="absolute top-1 right-1 z-50 flex items-center gap-0.5">
 				<button
 					onClick={() => handleSplit("horizontal")}
-					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
+					className="p-1 rounded bg-connexio-bg-secondary border border-connexio-border hover:bg-connexio-accent/20 hover:border-connexio-accent/40 transition-colors"
 					title="Split Right"
 					type="button"
 				>
-					<Columns2 size={12} className="text-connexio-text-muted" />
+					<Columns2 size={12} className="text-connexio-text-secondary" />
 				</button>
 				<button
 					onClick={() => handleSplit("vertical")}
-					className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-connexio-bg-tertiary transition-colors"
+					className="p-1 rounded bg-connexio-bg-secondary border border-connexio-border hover:bg-connexio-accent/20 hover:border-connexio-accent/40 transition-colors"
 					title="Split Down"
 					type="button"
 				>
-					<Rows2 size={12} className="text-connexio-text-muted" />
+					<Rows2 size={12} className="text-connexio-text-secondary" />
 				</button>
 				{canClose && (
 					<button
 						onClick={handleClosePane}
-						className="p-1 rounded bg-connexio-bg-secondary/80 border border-connexio-border hover:bg-red-500/20 transition-colors"
+						className="p-1 rounded bg-connexio-bg-secondary border border-connexio-border hover:bg-red-500/20 hover:border-red-500/40 transition-colors"
 						title="Close Pane"
 						type="button"
 					>
-						<X size={12} className="text-connexio-text-muted" />
+						<X size={12} className="text-connexio-text-secondary" />
 					</button>
 				)}
 			</div>

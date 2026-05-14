@@ -51,7 +51,7 @@ export default function TerminalLayer() {
 						className={`absolute inset-0 ${isVisible ? "block" : "hidden"}`}
 					>
 						{/* Base terminal (hidden when split is active) */}
-						<div className={hasSplit ? "hidden" : "w-full h-full"}>
+						<div className={`relative ${hasSplit ? "hidden" : "w-full h-full"}`}>
 							<Terminal terminalId={terminalId} isVisible={isVisible && !hasSplit} />
 						</div>
 
