@@ -54,12 +54,29 @@ pub fn run() {
             modules::workspace::workspace_save_state,
             // Git
             modules::git::git_status,
+            modules::git::git_changed_files,
+            modules::git::git_diff,
+            modules::git::git_diff_untracked,
             modules::git::git_stage,
+            modules::git::git_stage_all,
             modules::git::git_unstage,
+            modules::git::git_unstage_all,
+            modules::git::git_discard,
+            modules::git::git_open_file,
             modules::git::git_commit,
             modules::git::git_push,
             modules::git::git_pull,
             modules::git::git_fetch,
+            modules::git::git_history,
+            modules::git::git_branches,
+            modules::git::git_checkout,
+            modules::git::git_create_branch,
+            modules::git::git_publish_branch,
+            modules::git::git_stash_list,
+            modules::git::git_stash_save,
+            modules::git::git_stash_pop,
+            modules::git::git_stash_apply,
+            modules::git::git_stash_drop,
             // Tasks
             modules::tasks::tasks_detect,
             // Theme
@@ -81,6 +98,10 @@ pub fn run() {
             modules::ssh::ssh_save_global,
             modules::ssh::ssh_build_command,
             modules::ssh::ssh_key_exists,
+            // Updater
+            modules::updater::updater_check,
+            modules::updater::updater_download,
+            modules::updater::updater_install,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

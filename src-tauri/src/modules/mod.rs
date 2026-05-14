@@ -9,3 +9,4 @@ pub mod theme;
 pub mod session;
 pub mod pinned;
 pub mod ssh;
+pub mod updater;
