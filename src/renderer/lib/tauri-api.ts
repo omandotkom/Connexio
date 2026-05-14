@@ -157,6 +157,9 @@ export const ssh = {
 		});
 		return selected as string | null;
 	},
+
+	keyExists: (keyPath: string): Promise<boolean> =>
+		invoke("ssh_key_exists", { keyPath }),
 };
 
 // ─── Git ─────────────────────────────────────────────────────────────────────

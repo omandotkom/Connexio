@@ -5,3 +5,7 @@ pub mod workspace;
 pub mod git;
 pub mod tasks;
 pub mod shell;
+pub mod theme;
+pub mod session;
+pub mod pinned;
+pub mod ssh;

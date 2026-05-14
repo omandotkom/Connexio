@@ -3,6 +3,11 @@ mod modules;
 use modules::pty::PtyManager;
 use tauri::Manager;
 
+#[tauri::command]
+fn app_get_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -25,6 +30,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // App
+            app_get_version,
             // Terminal
             modules::pty::terminal_create,
             modules::pty::terminal_write,
@@ -53,6 +60,25 @@ pub fn run() {
             modules::git::git_fetch,
             // Tasks
             modules::tasks::tasks_detect,
+            // Theme
+            modules::theme::theme_get,
+            modules::theme::theme_set,
+            modules::theme::theme_list,
+            // Session
+            modules::session::session_save,
+            modules::session::session_load,
+            modules::session::session_list,
+            modules::session::session_delete,
+            // Pinned
+            modules::pinned::pinned_list,
+            modules::pinned::pinned_save,
+            // SSH
+            modules::ssh::ssh_list,
+            modules::ssh::ssh_save,
+            modules::ssh::ssh_list_global,
+            modules::ssh::ssh_save_global,
+            modules::ssh::ssh_build_command,
+            modules::ssh::ssh_key_exists,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
