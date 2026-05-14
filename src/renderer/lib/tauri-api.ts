@@ -8,7 +8,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
@@ -33,6 +33,18 @@ interface TerminalContext {
 	tabLabel: string;
 }
 
+// Global terminal data listeners — registered immediately on import
+type TerminalDataCallback = (id: string, data: string) => void;
+const terminalDataListeners = new Set<TerminalDataCallback>();
+
+// Start global listener immediately (not lazy)
+listen<[string, string]>("terminal:data", (event) => {
+	const [id, data] = event.payload;
+	for (const cb of terminalDataListeners) {
+		cb(id, data);
+	}
+});
+
 export const terminal = {
 	create: async (projectPath: string, shell?: string, context?: TerminalContext): Promise<string> => {
 		try {
@@ -53,22 +65,9 @@ export const terminal = {
 		invoke("terminal_close", { id }),
 
 	onData: (callback: (id: string, data: string) => void): (() => void) => {
-		let unlisten: UnlistenFn | null = null;
-		let disposed = false;
-		listen<[string, string]>("terminal:data", (event) => {
-			if (disposed) return;
-			const [id, data] = event.payload;
-			callback(id, data);
-		}).then((fn) => {
-			if (disposed) {
-				fn();
-			} else {
-				unlisten = fn;
-			}
-		});
+		terminalDataListeners.add(callback);
 		return () => {
-			disposed = true;
-			if (unlisten) unlisten();
+			terminalDataListeners.delete(callback);
 		};
 	},
 };

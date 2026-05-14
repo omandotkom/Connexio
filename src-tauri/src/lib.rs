@@ -17,7 +17,9 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .plugin(tauri_plugin_log::Builder::default().build())
+        .plugin(tauri_plugin_log::Builder::default()
+            .level(log::LevelFilter::Info)
+            .build())
         .setup(|app| {
             // Initialize PTY manager state
             app.manage(PtyManager::new());
