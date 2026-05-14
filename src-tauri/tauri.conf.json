@@ -44,7 +44,5 @@
     "shortDescription": "Project-based Terminal Manager",
     "longDescription": "Connexio organizes your terminals by project. Each project gets its own workspace with dedicated terminal tabs, persistent sessions, and productivity tools."
   },
-  "plugins": {
-    "window-state": {}
-  }
+  "plugins": {}
 }
