@@ -100,6 +100,14 @@ pub fn terminal_create(
             cmd.env("CONNEXIO_NOTIFICATION_PORT", format!("{}", port));
         }
     }
+
+    // Shell integration: set env vars for CWD reporting (OSC 7)
+    // These are picked up by shell profile/init without visible injection
+    let shell_lower = shell_path.replace('\\', "/").to_lowercase();
+    if shell_lower.contains("bash") {
+        // Bash: PROMPT_COMMAND emits OSC 7
+        cmd.env("PROMPT_COMMAND", r#"printf "\e]7;file://%s%s\a" "$HOSTNAME" "$PWD""#);
+    }
     if let Some(ref ctx) = context {
         cmd.env("CONNEXIO_PROJECT_ID", &ctx.project_id);
         cmd.env("CONNEXIO_PROJECT_NAME", &ctx.project_name);
@@ -142,9 +150,6 @@ pub fn terminal_create(
             },
         );
     }
-
-    // Inject shell integration init (OSC 7 CWD reporting)
-    inject_shell_integration(&state, &id, &shell_path);
 
     // Spawn reader thread to stream output to frontend
     let term_id = id.clone();
@@ -244,42 +249,3 @@ fn default_shell() -> String {
     }
 }
 
-/// Inject shell integration scripts for CWD reporting (OSC 7)
-fn inject_shell_integration(state: &PtyManager, id: &str, shell_path: &str) {
-    let shell_name = shell_path
-        .replace('\\', "/")
-        .split('/')
-        .last()
-        .unwrap_or("")
-        .to_lowercase();
-
-    let init_script = if shell_name.contains("pwsh") || shell_name.contains("powershell") {
-        // PowerShell: override prompt function to emit OSC 7
-        Some(
-            r#"function prompt { $loc = Get-Location; $esc = [char]27; $bel = [char]7; Write-Host -NoNewline "${esc}]7;file:///$($env:COMPUTERNAME)$($loc.Path.Replace('\','/'))${bel}"; return "PS $($loc.Path)> " }"#
-                .to_string() + "\r",
-        )
-    } else if shell_name.contains("bash") {
-        // Bash: set PROMPT_COMMAND to emit OSC 7
-        Some(
-            r#"PROMPT_COMMAND='printf "\e]7;file://%s%s\a" "$HOSTNAME" "$PWD"'"#
-                .to_string() + "\n",
-        )
-    } else if shell_name.contains("zsh") {
-        // Zsh: use chpwd hook
-        Some(
-            r#"chpwd() { printf '\e]7;file://%s%s\a' "$HOST" "$PWD" }; printf '\e]7;file://%s%s\a' "$HOST" "$PWD""#
-                .to_string() + "\n",
-        )
-    } else {
-        None
-    };
-
-    if let Some(script) = init_script {
-        // Write init script directly (shell is still initializing, small delay)
-        let mut sessions = state.sessions.lock().unwrap();
-        if let Some(session) = sessions.get_mut(id) {
-            let _ = session.writer.write_all(script.as_bytes());
-        }
-    }
-}
