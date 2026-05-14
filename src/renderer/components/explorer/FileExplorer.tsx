@@ -27,6 +27,7 @@ interface FileEntry {
 interface Props {
 	projectPath: string;
 	onOpenInTerminal?: (path: string) => void;
+	onOpenFile?: (filePath: string) => void;
 }
 
 function getFileIcon(entry: FileEntry) {
@@ -83,10 +84,12 @@ function FileTreeNode({
 	entry,
 	depth,
 	onOpenInTerminal,
+	onOpenFile,
 }: {
 	entry: FileEntry;
 	depth: number;
 	onOpenInTerminal?: (path: string) => void;
+	onOpenFile?: (filePath: string) => void;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [children, setChildren] = useState<FileEntry[] | null>(entry.children);
@@ -113,14 +116,8 @@ function FileTreeNode({
 	const handleClick = () => {
 		if (entry.isDir) {
 			toggleExpand();
-		} else {
-			// Open file with default OS app
-			invoke("git_open_file", {
-				projectPath: entry.path.substring(0, entry.path.lastIndexOf("\\")),
-				filePath: entry.name,
-			}).catch(() => {
-				// Fallback: try opener directly
-			});
+		} else if (onOpenFile) {
+			onOpenFile(entry.path);
 		}
 	};
 
@@ -177,6 +174,7 @@ function FileTreeNode({
 							entry={child}
 							depth={depth + 1}
 							onOpenInTerminal={onOpenInTerminal}
+							onOpenFile={onOpenFile}
 						/>
 					))}
 				</div>
@@ -194,7 +192,7 @@ function FileTreeNode({
 	);
 }
 
-export default function FileExplorer({ projectPath, onOpenInTerminal }: Props) {
+export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile }: Props) {
 	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showHidden, setShowHidden] = useState(false);
@@ -255,6 +253,7 @@ export default function FileExplorer({ projectPath, onOpenInTerminal }: Props) {
 							entry={entry}
 							depth={0}
 							onOpenInTerminal={onOpenInTerminal}
+							onOpenFile={onOpenFile}
 						/>
 					))
 				)}

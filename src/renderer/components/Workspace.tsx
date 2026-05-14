@@ -4,6 +4,7 @@ import { useProjectStore } from "../stores/projectStore";
 import { AIChatPanel } from "./ai";
 import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
+import { CodeEditor } from "./editor";
 import { FileExplorer } from "./explorer";
 import ShellPicker from "./ShellPicker";
 import SourcePanel from "./SourcePanel";
@@ -36,6 +37,7 @@ export default function Workspace() {
 	const [closeConfirmTabId, setCloseConfirmTabId] = useState<string | null>(
 		null,
 	);
+	const [editorFile, setEditorFile] = useState<string | null>(null);
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
 	// Resizable side panel
@@ -305,9 +307,16 @@ export default function Workspace() {
 
 			{/* Main content area */}
 			<div className="flex flex-1 overflow-hidden">
-				{/* Terminal Area */}
-				<div className="flex-1 relative overflow-hidden">
-					<TerminalLayer />
+				{/* Terminal / Editor Area */}
+				<div className="flex-1 relative overflow-hidden flex flex-col">
+					{editorFile ? (
+						<CodeEditor
+							filePath={editorFile}
+							onClose={() => setEditorFile(null)}
+						/>
+					) : (
+						<TerminalLayer />
+					)}
 				</div>
 
 				{/* Right Side Panel */}
@@ -406,6 +415,7 @@ export default function Workspace() {
 								onOpenInTerminal={(path) => {
 									openTerminalTab(activeProjectId, `Terminal (${path.split(/[\\/]/).pop()})`);
 								}}
+								onOpenFile={(filePath) => setEditorFile(filePath)}
 							/>
 						)}
 						{sidePanelTab === "source" && (

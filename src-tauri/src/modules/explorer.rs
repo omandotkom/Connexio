@@ -157,3 +157,24 @@ fn read_tree_recursive(dir_path: &str, depth: u32) -> Result<Vec<FileEntry>, Str
 
     Ok(entries)
 }
+
+/// Read file content as string
+#[tauri::command]
+pub fn explorer_read_file(_app: AppHandle, file_path: String) -> Result<String, String> {
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!("Not a file: {}", file_path));
+    }
+    // Check file size (limit to 5MB)
+    let metadata = fs::metadata(path).map_err(|e| format!("Cannot read metadata: {}", e))?;
+    if metadata.len() > 5 * 1024 * 1024 {
+        return Err("File too large (>5MB)".to_string());
+    }
+    fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+/// Write content to a file
+#[tauri::command]
+pub fn explorer_write_file(_app: AppHandle, file_path: String, content: String) -> Result<(), String> {
+    fs::write(&file_path, &content).map_err(|e| format!("Failed to write file: {}", e))
+}
