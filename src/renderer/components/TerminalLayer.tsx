@@ -1,7 +1,5 @@
 import { useProjectStore } from "../stores/projectStore";
-import { usePaneStore } from "../stores/paneStore";
 import Terminal from "./Terminal";
-import { SplitTerminalArea } from "./panes";
 
 /**
  * Renders ALL terminal instances from ALL projects.
@@ -10,12 +8,9 @@ import { SplitTerminalArea } from "./panes";
  *
  * Visibility is controlled via CSS display:none which keeps the xterm.js
  * instance alive but prevents it from consuming layout/paint resources.
- *
- * Split pane overlay is shown on the active tab when splits exist.
  */
 export default function TerminalLayer() {
 	const { workspaceTabs, activeTabIds, activeProjectId } = useProjectStore();
-	const { paneTrees } = usePaneStore();
 
 	// Collect all terminals across all projects
 	const allTerminals: Array<{
@@ -42,27 +37,13 @@ export default function TerminalLayer() {
 				const isProjectActive = projectId === activeProjectId;
 				const isTabActive = activeTabIds[projectId] === tabId;
 				const isVisible = isProjectActive && isTabActive;
-				const splitKey = `${projectId}:${tabId}`;
-				const hasSplit = !!paneTrees[splitKey];
 
 				return (
 					<div
 						key={terminalId}
 						className={`absolute inset-0 ${isVisible ? "block" : "hidden"}`}
 					>
-						{/* Base terminal (hidden when split is active) */}
-						<div className={`relative ${hasSplit ? "hidden" : "w-full h-full"}`}>
-							<Terminal terminalId={terminalId} isVisible={isVisible && !hasSplit} />
-						</div>
-
-						{/* Split pane overlay + controls */}
-						{isVisible && (
-							<SplitTerminalArea
-								projectId={projectId}
-								terminalId={terminalId}
-								tabId={tabId}
-							/>
-						)}
+						<Terminal terminalId={terminalId} isVisible={isVisible} />
 					</div>
 				);
 			})}
