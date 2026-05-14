@@ -23,6 +23,7 @@ export default function Workspace() {
 		workspaceTabs,
 		activeTabIds,
 		openTerminalTab,
+		openEditorTab,
 		closeTerminalTab,
 		setActiveTerminalTab,
 		renameTerminalTab,
@@ -38,7 +39,6 @@ export default function Workspace() {
 	const [closeConfirmTabId, setCloseConfirmTabId] = useState<string | null>(
 		null,
 	);
-	const [editorFile, setEditorFile] = useState<string | null>(null);
 	const [showPreview, setShowPreview] = useState(false);
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
@@ -325,23 +325,24 @@ export default function Workspace() {
 			<div className="flex flex-1 overflow-hidden">
 				{/* Terminal / Editor / Preview Area */}
 				<div className="flex-1 relative overflow-hidden flex flex-col">
-					{/* Terminal always rendered (keeps processes alive) */}
-					<div className={showPreview || editorFile ? "hidden" : "w-full h-full"}>
-						<TerminalLayer />
-					</div>
-
-					{/* Editor overlay */}
-					{editorFile && !showPreview && (
-						<CodeEditor
-							filePath={editorFile}
-							onClose={() => setEditorFile(null)}
-						/>
-					)}
-
-					{/* Web Preview overlay */}
+					{/* Web Preview (takes over entire area) */}
 					{showPreview && (
 						<WebPreview onClose={() => setShowPreview(false)} />
 					)}
+
+					{/* Editor tab (shown when active tab is editor type) */}
+					{!showPreview && activeTab?.type === "editor" && activeTab.filePath && (
+						<CodeEditor
+							key={activeTab.filePath}
+							filePath={activeTab.filePath}
+							onClose={() => closeTerminalTab(activeProjectId, activeTab.id)}
+						/>
+					)}
+
+					{/* Terminal (shown when active tab is terminal type) */}
+					<div className={showPreview || activeTab?.type === "editor" ? "hidden" : "w-full h-full"}>
+						<TerminalLayer />
+					</div>
 				</div>
 
 				{/* Right Side Panel */}
@@ -440,7 +441,7 @@ export default function Workspace() {
 								onOpenInTerminal={(path) => {
 									openTerminalTab(activeProjectId, `Terminal (${path.split(/[\\/]/).pop()})`);
 								}}
-								onOpenFile={(filePath) => setEditorFile(filePath)}
+								onOpenFile={(filePath) => openEditorTab(activeProjectId, filePath)}
 							/>
 						)}
 						{sidePanelTab === "source" && (

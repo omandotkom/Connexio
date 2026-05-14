@@ -15,6 +15,9 @@ export interface TerminalTab {
 	label: string;
 	shell?: string;
 	terminalId: string | null;
+	// Editor tab support
+	type?: "terminal" | "editor" | "preview";
+	filePath?: string;
 }
 
 interface ProjectStore {
@@ -47,6 +50,7 @@ interface ProjectStore {
 		label?: string,
 		shell?: string,
 	) => Promise<void>;
+	openEditorTab: (projectId: string, filePath: string) => void;
 	closeTerminalTab: (projectId: string, tabId: string) => void;
 	setActiveTerminalTab: (projectId: string, tabId: string) => void;
 	renameTerminalTab: (
@@ -259,6 +263,38 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 		});
 
 		get().persistWorkspace();
+	},
+
+	openEditorTab: (projectId: string, filePath: string) => {
+		const { workspaceTabs, activeTabIds } = get();
+		const existingTabs = workspaceTabs[projectId] || [];
+
+		// Check if file is already open in a tab
+		const existing = existingTabs.find((t) => t.filePath === filePath);
+		if (existing) {
+			set({ activeTabIds: { ...activeTabIds, [projectId]: existing.id } });
+			return;
+		}
+
+		const fileName = filePath.replace(/\\/g, "/").split("/").pop() || "file";
+		const newTab: TerminalTab = {
+			id: uuid(),
+			label: fileName,
+			type: "editor",
+			filePath,
+			terminalId: null,
+		};
+
+		set({
+			workspaceTabs: {
+				...workspaceTabs,
+				[projectId]: [...existingTabs, newTab],
+			},
+			activeTabIds: {
+				...activeTabIds,
+				[projectId]: newTab.id,
+			},
+		});
 	},
 
 	closeTerminalTab: (projectId: string, tabId: string) => {
