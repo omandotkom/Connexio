@@ -128,6 +128,10 @@ pub fn run() {
             modules::explorer::explorer_read_tree,
             modules::explorer::explorer_read_file,
             modules::explorer::explorer_write_file,
+            modules::explorer::explorer_rename,
+            modules::explorer::explorer_delete,
+            modules::explorer::explorer_new_file,
+            modules::explorer::explorer_new_folder,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

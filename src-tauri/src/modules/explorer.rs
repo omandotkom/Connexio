@@ -178,3 +178,43 @@ pub fn explorer_read_file(_app: AppHandle, file_path: String) -> Result<String, 
 pub fn explorer_write_file(_app: AppHandle, file_path: String, content: String) -> Result<(), String> {
     fs::write(&file_path, &content).map_err(|e| format!("Failed to write file: {}", e))
 }
+
+/// Rename a file or directory
+#[tauri::command]
+pub fn explorer_rename(_app: AppHandle, old_path: String, new_path: String) -> Result<(), String> {
+    fs::rename(&old_path, &new_path).map_err(|e| format!("Failed to rename: {}", e))
+}
+
+/// Delete a file or directory
+#[tauri::command]
+pub fn explorer_delete(_app: AppHandle, target_path: String) -> Result<(), String> {
+    let path = Path::new(&target_path);
+    if path.is_dir() {
+        fs::remove_dir_all(path).map_err(|e| format!("Failed to delete directory: {}", e))
+    } else {
+        fs::remove_file(path).map_err(|e| format!("Failed to delete file: {}", e))
+    }
+}
+
+/// Create a new file
+#[tauri::command]
+pub fn explorer_new_file(_app: AppHandle, file_path: String) -> Result<(), String> {
+    let path = Path::new(&file_path);
+    if path.exists() {
+        return Err("File already exists".to_string());
+    }
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::write(path, "").map_err(|e| format!("Failed to create file: {}", e))
+}
+
+/// Create a new directory
+#[tauri::command]
+pub fn explorer_new_folder(_app: AppHandle, dir_path: String) -> Result<(), String> {
+    let path = Path::new(&dir_path);
+    if path.exists() {
+        return Err("Directory already exists".to_string());
+    }
+    fs::create_dir_all(path).map_err(|e| format!("Failed to create directory: {}", e))
+}

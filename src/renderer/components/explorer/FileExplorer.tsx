@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import ExplorerContextMenu from "./ExplorerContextMenu";
 
 interface FileEntry {
 	name: string;
@@ -85,11 +86,13 @@ function FileTreeNode({
 	depth,
 	onOpenInTerminal,
 	onOpenFile,
+	onContextMenu,
 }: {
 	entry: FileEntry;
 	depth: number;
 	onOpenInTerminal?: (path: string) => void;
 	onOpenFile?: (filePath: string) => void;
+	onContextMenu?: (e: React.MouseEvent, entry: FileEntry) => void;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [children, setChildren] = useState<FileEntry[] | null>(entry.children);
@@ -123,8 +126,8 @@ function FileTreeNode({
 
 	const handleContextMenu = (e: React.MouseEvent) => {
 		e.preventDefault();
-		if (entry.isDir && onOpenInTerminal) {
-			onOpenInTerminal(entry.path);
+		if (onContextMenu) {
+			onContextMenu(e, entry);
 		}
 	};
 
@@ -175,6 +178,7 @@ function FileTreeNode({
 							depth={depth + 1}
 							onOpenInTerminal={onOpenInTerminal}
 							onOpenFile={onOpenFile}
+							onContextMenu={onContextMenu}
 						/>
 					))}
 				</div>
@@ -196,6 +200,14 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showHidden, setShowHidden] = useState(false);
+	const [contextMenu, setContextMenu] = useState<{
+		x: number;
+		y: number;
+		entry: FileEntry;
+	} | null>(null);
+	const [renaming, setRenaming] = useState<string | null>(null);
+	const [newItemType, setNewItemType] = useState<"file" | "folder" | null>(null);
+	const [newItemParent, setNewItemParent] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!projectPath) return;
@@ -210,6 +222,56 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 				setLoading(false);
 			});
 	}, [projectPath]);
+
+	const refresh = () => {
+		invoke<FileEntry[]>("explorer_list_dir", { dirPath: projectPath })
+			.then(setEntries)
+			.catch(() => {});
+	};
+
+	const handleContextMenu = (e: React.MouseEvent, entry: FileEntry) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setContextMenu({ x: e.clientX, y: e.clientY, entry });
+	};
+
+	const handleRename = async (oldPath: string, newName: string) => {
+		const dir = oldPath.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+		const newPath = `${dir}/${newName}`;
+		try {
+			await invoke("explorer_rename", { oldPath, newPath });
+			refresh();
+		} catch (e) {
+			console.error("Rename failed:", e);
+		}
+		setRenaming(null);
+	};
+
+	const handleDelete = async (targetPath: string) => {
+		if (!confirm("Are you sure you want to delete this?")) return;
+		try {
+			await invoke("explorer_delete", { targetPath });
+			refresh();
+		} catch (e) {
+			console.error("Delete failed:", e);
+		}
+	};
+
+	const handleNewItem = async (parentDir: string, name: string, type: "file" | "folder") => {
+		const fullPath = `${parentDir.replace(/\\/g, "/")}/${name}`;
+		try {
+			if (type === "file") {
+				await invoke("explorer_new_file", { filePath: fullPath });
+			} else {
+				await invoke("explorer_new_folder", { dirPath: fullPath });
+			}
+			refresh();
+		} catch (e) {
+			console.error("Create failed:", e);
+		}
+		setNewItemType(null);
+		setNewItemParent(null);
+	};
 
 	const filteredEntries = showHidden
 		? entries
@@ -254,10 +316,48 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 							depth={0}
 							onOpenInTerminal={onOpenInTerminal}
 							onOpenFile={onOpenFile}
+							onContextMenu={handleContextMenu}
 						/>
 					))
 				)}
 			</div>
+
+			{/* Context Menu */}
+			{contextMenu && (
+				<ExplorerContextMenu
+					x={contextMenu.x}
+					y={contextMenu.y}
+					isDir={contextMenu.entry.isDir}
+					filePath={contextMenu.entry.path}
+					fileName={contextMenu.entry.name}
+					onClose={() => setContextMenu(null)}
+					onRename={() => setRenaming(contextMenu.entry.path)}
+					onDelete={() => handleDelete(contextMenu.entry.path)}
+					onNewFile={() => {
+						const dir = contextMenu.entry.isDir ? contextMenu.entry.path : projectPath;
+						const name = prompt("New file name:");
+						if (name) handleNewItem(dir, name, "file");
+					}}
+					onNewFolder={() => {
+						const dir = contextMenu.entry.isDir ? contextMenu.entry.path : projectPath;
+						const name = prompt("New folder name:");
+						if (name) handleNewItem(dir, name, "folder");
+					}}
+					onCopyPath={() => {
+						navigator.clipboard.writeText(contextMenu.entry.path).catch(() => {});
+					}}
+					onOpenInTerminal={() => {
+						const dir = contextMenu.entry.isDir ? contextMenu.entry.path : projectPath;
+						if (onOpenInTerminal) onOpenInTerminal(dir);
+					}}
+					onOpenExternal={() => {
+						invoke("git_open_file", {
+							projectPath: contextMenu.entry.path.substring(0, contextMenu.entry.path.lastIndexOf("\\")),
+							filePath: contextMenu.entry.name,
+						}).catch(() => {});
+					}}
+				/>
+			)}
 		</div>
 	);
 }

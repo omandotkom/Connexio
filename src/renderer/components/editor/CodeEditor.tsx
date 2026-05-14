@@ -9,7 +9,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { rust } from "@codemirror/lang-rust";
 import { Save, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 // Dark theme matching Connexio
@@ -82,8 +82,24 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const originalContentRef = useRef("");
+	const saveRef = useRef<() => void>(() => {});
 
 	const fileName = filePath.replace(/\\/g, "/").split("/").pop() || "untitled";
+
+	// Save function (ref to avoid stale closure in keymap)
+	saveRef.current = async () => {
+		if (!viewRef.current || saving) return;
+		const content = viewRef.current.state.doc.toString();
+		setSaving(true);
+		try {
+			await invoke("explorer_write_file", { filePath, content });
+			originalContentRef.current = content;
+			setIsDirty(false);
+		} catch (e) {
+			setError(String(e));
+		}
+		setSaving(false);
+	};
 
 	// Load file and create editor
 	useEffect(() => {
@@ -110,7 +126,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 							{
 								key: "Mod-s",
 								run: () => {
-									handleSave();
+									saveRef.current();
 									return true;
 								},
 							},
@@ -144,19 +160,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		};
 	}, [filePath]);
 
-	const handleSave = useCallback(async () => {
-		if (!viewRef.current || saving) return;
-		const content = viewRef.current.state.doc.toString();
-		setSaving(true);
-		try {
-			await invoke("explorer_write_file", { filePath, content });
-			originalContentRef.current = content;
-			setIsDirty(false);
-		} catch (e) {
-			setError(String(e));
-		}
-		setSaving(false);
-	}, [filePath, saving]);
+	const handleSave = () => saveRef.current();
 
 	return (
 		<div className="flex flex-col h-full">
