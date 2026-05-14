@@ -25,8 +25,11 @@ export default function App() {
 	} = useNotificationStore();
 
 	useEffect(() => {
+		let mounted = true;
 		const init = async () => {
+			if (!mounted) return;
 			await loadProjects();
+			if (!mounted) return;
 			await restoreWorkspace();
 			loadTheme();
 			loadThemes();
@@ -36,6 +39,7 @@ export default function App() {
 			loadNotifSettings();
 		};
 		init();
+		return () => { mounted = false; };
 	}, []);
 
 	// Listen for real-time notifications from main process

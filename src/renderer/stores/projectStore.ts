@@ -1,5 +1,9 @@
 import { v4 as uuid } from "uuid";
 import { create } from "zustand";
+
+// Module-level guard to prevent double restore from React StrictMode
+let _workspaceRestored = false;
+
 import type {
 	Project,
 	WorkspaceState,
@@ -339,6 +343,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 	// === Persistence ===
 
 	restoreWorkspace: async () => {
+		// Guard: only restore once (React StrictMode calls useEffect twice)
+		if (get().isRestoring) return;
+		if (_workspaceRestored) return;
+		_workspaceRestored = true;
 		set({ isRestoring: true });
 
 		try {
