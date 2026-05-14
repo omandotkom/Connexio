@@ -12,32 +12,15 @@ import { Save, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-// Dark theme matching Connexio
 const connexioDarkTheme = EditorView.theme({
-	"&": {
-		backgroundColor: "#0f1117",
-		color: "#e2e8f0",
-		height: "100%",
-		fontSize: "12px",
-	},
-	".cm-content": {
-		fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
-		caretColor: "#7c3aed",
-	},
+	"&": { backgroundColor: "#0f1117", color: "#e2e8f0", height: "100%", fontSize: "12px" },
+	".cm-content": { fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace", caretColor: "#7c3aed" },
 	".cm-cursor": { borderLeftColor: "#7c3aed" },
 	".cm-activeLine": { backgroundColor: "#1e203020" },
 	".cm-activeLineGutter": { backgroundColor: "#1e203040" },
-	".cm-gutters": {
-		backgroundColor: "#0f1117",
-		color: "#64748b",
-		border: "none",
-		fontFamily: "'JetBrains Mono', monospace",
-		fontSize: "11px",
-	},
+	".cm-gutters": { backgroundColor: "#0f1117", color: "#64748b", border: "none", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px" },
 	".cm-scroller": { overflow: "auto" },
-	"&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
-		backgroundColor: "#7c3aed30",
-	},
+	"&.cm-focused .cm-selectionBackground, .cm-selectionBackground": { backgroundColor: "#7c3aed30" },
 	".cm-selectionMatch": { backgroundColor: "#7c3aed20" },
 }, { dark: true });
 
@@ -49,29 +32,15 @@ interface Props {
 function getLanguageExtension(filePath: string) {
 	const ext = filePath.split(".").pop()?.toLowerCase();
 	switch (ext) {
-		case "js":
-		case "jsx":
-			return javascript({ jsx: true });
-		case "ts":
-		case "tsx":
-			return javascript({ jsx: true, typescript: true });
-		case "json":
-			return json();
-		case "html":
-		case "htm":
-			return html();
-		case "css":
-		case "scss":
-			return css();
-		case "md":
-		case "mdx":
-			return markdown();
-		case "py":
-			return python();
-		case "rs":
-			return rust();
-		default:
-			return javascript();
+		case "js": case "jsx": return javascript({ jsx: true });
+		case "ts": case "tsx": return javascript({ jsx: true, typescript: true });
+		case "json": return json();
+		case "html": case "htm": return html();
+		case "css": case "scss": return css();
+		case "md": case "mdx": return markdown();
+		case "py": return python();
+		case "rs": return rust();
+		default: return javascript();
 	}
 }
 
@@ -86,44 +55,57 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 	const filePathRef = useRef(filePath);
 	filePathRef.current = filePath;
 
+	// Use ref so the keydown handler always calls the latest save logic
+	const saveRef = useRef<() => Promise<void>>(async () => {});
+
 	const fileName = filePath.replace(/\\/g, "/").split("/").pop() || "untitled";
 
-	// Save function
-	const doSave = async () => {
-		if (!viewRef.current) return;
-		const content = viewRef.current.state.doc.toString();
-		if (content === originalContentRef.current) return; // nothing to save
+	// Keep saveRef always up to date
+	saveRef.current = async () => {
+		const view = viewRef.current;
+		if (!view) {
+			console.error("[Editor] No view ref");
+			return;
+		}
+		const content = view.state.doc.toString();
+		if (content === originalContentRef.current) {
+			setSaveStatus("No changes");
+			setTimeout(() => setSaveStatus(null), 1500);
+			return;
+		}
 		setSaving(true);
 		setError(null);
 		try {
-			await invoke("explorer_write_file", { filePath: filePathRef.current, content });
+			await invoke("explorer_write_file", {
+				filePath: filePathRef.current,
+				content,
+			});
 			originalContentRef.current = content;
 			setIsDirty(false);
-			setSaveStatus("Saved");
+			setSaveStatus("Saved ✓");
 			setTimeout(() => setSaveStatus(null), 2000);
-		} catch (e) {
-			setError(String(e));
+		} catch (e: any) {
+			setError(typeof e === "string" ? e : e?.message || "Save failed");
 		}
 		setSaving(false);
 	};
 
-	// Global Ctrl+S handler (prevents browser default + triggers save)
+	// Global Ctrl+S — uses ref so it always has latest save function
 	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+		const handler = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
 				e.preventDefault();
 				e.stopPropagation();
-				doSave();
+				saveRef.current();
 			}
 		};
-		window.addEventListener("keydown", handleKeyDown, true);
-		return () => window.removeEventListener("keydown", handleKeyDown, true);
+		window.addEventListener("keydown", handler, true);
+		return () => window.removeEventListener("keydown", handler, true);
 	}, []);
 
 	// Load file and create editor
 	useEffect(() => {
 		if (!containerRef.current) return;
-
 		let view: EditorView | null = null;
 
 		invoke<string>("explorer_read_file", { filePath })
@@ -138,11 +120,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						highlightActiveLine(),
 						highlightActiveLineGutter(),
 						history(),
-						keymap.of([
-							...defaultKeymap,
-							...historyKeymap,
-							indentWithTab,
-						]),
+						keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
 						getLanguageExtension(filePath),
 						connexioDarkTheme,
 						EditorView.updateListener.of((update) => {
@@ -154,45 +132,29 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 					],
 				});
 
-				view = new EditorView({
-					state,
-					parent: containerRef.current,
-				});
+				view = new EditorView({ state, parent: containerRef.current });
 				viewRef.current = view;
 			})
-			.catch((e) => {
-				setError(String(e));
-			});
+			.catch((e) => setError(String(e)));
 
 		return () => {
-			if (view) {
-				view.destroy();
-				viewRef.current = null;
-			}
+			if (view) { view.destroy(); viewRef.current = null; }
 		};
 	}, [filePath]);
 
-	const handleSave = () => doSave();
-
 	return (
 		<div className="flex flex-col h-full">
-			{/* Editor header */}
+			{/* Header */}
 			<div className="flex items-center justify-between px-3 py-1.5 border-b border-connexio-border bg-connexio-bg-secondary">
 				<div className="flex items-center gap-2">
-					<span className="text-[11px] text-connexio-text font-medium">
-						{fileName}
-					</span>
-					{isDirty && (
-						<span className="w-2 h-2 rounded-full bg-connexio-accent" title="Unsaved changes" />
-					)}
-					{saveStatus && (
-						<span className="text-[10px] text-green-400">{saveStatus}</span>
-					)}
+					<span className="text-[11px] text-connexio-text font-medium">{fileName}</span>
+					{isDirty && <span className="w-2 h-2 rounded-full bg-connexio-accent" title="Unsaved changes" />}
+					{saveStatus && <span className="text-[10px] text-green-400">{saveStatus}</span>}
 				</div>
 				<div className="flex items-center gap-1">
 					<button
-						onClick={handleSave}
-						disabled={!isDirty || saving}
+						onClick={() => saveRef.current()}
+						disabled={saving}
 						className="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded bg-connexio-accent/10 text-connexio-accent hover:bg-connexio-accent/20 disabled:opacity-30 transition-colors"
 						title="Save (Ctrl+S)"
 						type="button"
@@ -211,14 +173,10 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 				</div>
 			</div>
 
-			{/* Error */}
 			{error && (
-				<div className="px-3 py-1.5 text-[11px] text-red-400 bg-red-500/10 border-b border-red-500/20">
-					{error}
-				</div>
+				<div className="px-3 py-1.5 text-[11px] text-red-400 bg-red-500/10 border-b border-red-500/20">{error}</div>
 			)}
 
-			{/* Editor area */}
 			<div ref={containerRef} className="flex-1 overflow-hidden" />
 		</div>
 	);
