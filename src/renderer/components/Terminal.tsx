@@ -3,7 +3,6 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalThemeColors } from "../../shared/types";
-import { parseOscSequences, useShellIntegrationStore } from "../stores/shellIntegrationStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
 import TerminalContextMenu from "./TerminalContextMenu";
@@ -221,8 +220,6 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			(id: string, data: string) => {
 				if (id === terminalId) {
 					batchWrite(data);
-					// Parse shell integration sequences (OSC 7, OSC 133)
-					parseOscSequences(data, terminalId, useShellIntegrationStore.getState());
 				}
 			},
 		);
