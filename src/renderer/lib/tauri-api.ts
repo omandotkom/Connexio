@@ -34,14 +34,20 @@ interface TerminalContext {
 }
 
 export const terminal = {
-	create: (projectPath: string, shell?: string, context?: TerminalContext): Promise<string> =>
-		invoke("terminal_create", { projectPath, shell, context }),
+	create: async (projectPath: string, shell?: string, context?: TerminalContext): Promise<string> => {
+		try {
+			return await invoke("terminal_create", { projectPath, shell: shell || null, context: context || null });
+		} catch (e) {
+			console.error("[Tauri] terminal_create failed:", e);
+			throw e;
+		}
+	},
 
 	write: (id: string, data: string): Promise<void> =>
 		invoke("terminal_write", { id, data }),
 
 	resize: (id: string, cols: number, rows: number): Promise<void> =>
-		invoke("terminal_resize", { id, cols: cols as number, rows: rows as number }),
+		invoke("terminal_resize", { id, cols: Math.round(cols), rows: Math.round(rows) }),
 
 	close: (id: string): Promise<void> =>
 		invoke("terminal_close", { id }),

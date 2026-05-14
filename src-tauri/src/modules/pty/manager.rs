@@ -30,6 +30,7 @@ impl PtyManager {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TerminalContext {
     pub project_id: String,
     pub project_name: String,
