@@ -13,8 +13,6 @@ interface Props {
 	x: number;
 	y: number;
 	isDir: boolean;
-	filePath: string;
-	fileName: string;
 	onClose: () => void;
 	onRename: () => void;
 	onDelete: () => void;
@@ -29,8 +27,6 @@ export default function ExplorerContextMenu({
 	x,
 	y,
 	isDir,
-	filePath,
-	fileName,
 	onClose,
 	onRename,
 	onDelete,
@@ -59,13 +55,10 @@ export default function ExplorerContextMenu({
 		};
 	}, [onClose]);
 
-	// Adjust position to stay within viewport
-	const style: React.CSSProperties = {
-		position: "fixed",
-		left: x,
-		top: y,
-		zIndex: 9999,
-	};
+	const width = 180;
+	const height = isDir ? 250 : 170;
+	const left = Math.min(x, window.innerWidth - width - 8);
+	const top = Math.min(y, window.innerHeight - height - 8);
 
 	const MenuItem = ({
 		icon: Icon,
@@ -98,8 +91,8 @@ export default function ExplorerContextMenu({
 	return (
 		<div
 			ref={menuRef}
-			style={style}
-			className="bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-xl py-1 min-w-[160px]"
+			style={{ position: "fixed", left, top, zIndex: 9999, width }}
+			className="bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-xl py-1"
 		>
 			{isDir && (
 				<>

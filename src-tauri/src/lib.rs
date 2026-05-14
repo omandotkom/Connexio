@@ -132,6 +132,7 @@ pub fn run() {
             modules::explorer::explorer_delete,
             modules::explorer::explorer_new_file,
             modules::explorer::explorer_new_folder,
+            modules::explorer::explorer_open_path,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

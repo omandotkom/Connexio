@@ -218,3 +218,9 @@ pub fn explorer_new_folder(_app: AppHandle, dir_path: String) -> Result<(), Stri
     }
     fs::create_dir_all(path).map_err(|e| format!("Failed to create directory: {}", e))
 }
+
+/// Open a path with the operating system default application
+#[tauri::command]
+pub fn explorer_open_path(_app: AppHandle, target_path: String) -> Result<(), String> {
+    opener::open(&target_path).map_err(|e| format!("Failed to open path: {}", e))
+}
