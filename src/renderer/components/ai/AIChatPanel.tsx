@@ -271,8 +271,12 @@ function AISettingsPanel({ onBack }: { onBack: () => void }) {
 						Model
 					</label>
 					<select
-						value={config.model}
-						onChange={(e) => setConfig({ model: e.target.value })}
+						value={currentProvider?.models.includes(config.model) ? config.model : "__custom__"}
+						onChange={(e) => {
+							if (e.target.value !== "__custom__") {
+								setConfig({ model: e.target.value });
+							}
+						}}
 						className="w-full text-[11px] px-2 py-1.5 bg-connexio-bg-tertiary border border-connexio-border rounded text-connexio-text outline-none"
 					>
 						{currentProvider?.models.map((m) => (
@@ -280,7 +284,16 @@ function AISettingsPanel({ onBack }: { onBack: () => void }) {
 								{m}
 							</option>
 						))}
+						<option value="__custom__">Custom...</option>
 					</select>
+					{/* Custom model input */}
+					<input
+						type="text"
+						value={config.model}
+						onChange={(e) => setConfig({ model: e.target.value })}
+						placeholder="Enter model name (e.g. gpt-4o, claude-sonnet-4-20250514)"
+						className="w-full mt-1.5 text-[11px] px-2 py-1.5 bg-connexio-bg-tertiary border border-connexio-border rounded text-connexio-text placeholder:text-connexio-text-muted outline-none"
+					/>
 				</div>
 
 				{/* API Key */}
