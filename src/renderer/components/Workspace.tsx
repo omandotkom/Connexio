@@ -325,15 +325,22 @@ export default function Workspace() {
 			<div className="flex flex-1 overflow-hidden">
 				{/* Terminal / Editor / Preview Area */}
 				<div className="flex-1 relative overflow-hidden flex flex-col">
-					{showPreview ? (
-						<WebPreview onClose={() => setShowPreview(false)} />
-					) : editorFile ? (
+					{/* Terminal always rendered (keeps processes alive) */}
+					<div className={showPreview || editorFile ? "hidden" : "w-full h-full"}>
+						<TerminalLayer />
+					</div>
+
+					{/* Editor overlay */}
+					{editorFile && !showPreview && (
 						<CodeEditor
 							filePath={editorFile}
 							onClose={() => setEditorFile(null)}
 						/>
-					) : (
-						<TerminalLayer />
+					)}
+
+					{/* Web Preview overlay */}
+					{showPreview && (
+						<WebPreview onClose={() => setShowPreview(false)} />
 					)}
 				</div>
 
