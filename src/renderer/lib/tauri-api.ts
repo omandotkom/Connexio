@@ -48,13 +48,20 @@ export const terminal = {
 
 	onData: (callback: (id: string, data: string) => void): (() => void) => {
 		let unlisten: UnlistenFn | null = null;
+		let disposed = false;
 		listen<[string, string]>("terminal:data", (event) => {
+			if (disposed) return;
 			const [id, data] = event.payload;
 			callback(id, data);
 		}).then((fn) => {
-			unlisten = fn;
+			if (disposed) {
+				fn();
+			} else {
+				unlisten = fn;
+			}
 		});
 		return () => {
+			disposed = true;
 			if (unlisten) unlisten();
 		};
 	},
@@ -191,7 +198,11 @@ export const git = {
 
 export const theme = {
 	get: (): Promise<AppTheme> => invoke("theme_get"),
-	set: (themeId: string): Promise<void> => invoke("theme_set", { themeId }),
+	set: async (themeId: string): Promise<AppTheme> => {
+		await invoke("theme_set", { themeId });
+		// Return the theme after setting it
+		return invoke("theme_get");
+	},
 	list: (): Promise<AppTheme[]> => invoke("theme_list"),
 };
 
