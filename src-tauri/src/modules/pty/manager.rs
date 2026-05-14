@@ -83,7 +83,12 @@ pub fn terminal_create(
     };
     cmd.cwd(&cwd);
 
-    // Set environment
+    // Inherit all environment variables from parent process first
+    for (key, value) in std::env::vars() {
+        cmd.env(key, value);
+    }
+
+    // Then override/add specific ones
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Connexio");
