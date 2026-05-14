@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
+import CwdIndicator from "./CwdIndicator";
 import { FileExplorer } from "./explorer";
 import ShellPicker from "./ShellPicker";
 import SourcePanel from "./SourcePanel";
@@ -191,6 +192,9 @@ export default function Workspace() {
 				<span className="text-[10px] text-connexio-text-muted truncate opacity-60 flex-shrink min-w-0">
 					{project.path}
 				</span>
+
+				{/* CWD indicator */}
+				<CwdIndicator />
 
 				{/* Command Timer for active terminal */}
 				{activeTab?.terminalId && (
