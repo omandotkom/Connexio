@@ -75,6 +75,26 @@ pub fn projects_update(app: AppHandle, project: Project) -> Vec<Project> {
 }
 
 #[tauri::command]
+pub fn projects_reorder(app: AppHandle, ids: Vec<String>) -> Vec<Project> {
+    let projects = load_projects(&app);
+    // Reorder projects according to the provided ID order
+    let mut reordered: Vec<Project> = Vec::with_capacity(ids.len());
+    for id in &ids {
+        if let Some(p) = projects.iter().find(|p| p.id == *id) {
+            reordered.push(p.clone());
+        }
+    }
+    // Append any projects not in the ids list (safety net)
+    for p in &projects {
+        if !ids.contains(&p.id) {
+            reordered.push(p.clone());
+        }
+    }
+    save_projects(&app, &reordered);
+    reordered
+}
+
+#[tauri::command]
 pub fn projects_delete(app: AppHandle, id: String) -> Vec<Project> {
     let mut projects = load_projects(&app);
     projects.retain(|p| p.id != id);

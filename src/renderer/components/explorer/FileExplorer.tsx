@@ -10,10 +10,13 @@ import {
 	FolderOpen,
 	FolderPlus,
 	Image,
+	Loader2,
 	RefreshCw,
+	Search,
 	Terminal,
+	X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ExplorerContextMenu from "./ExplorerContextMenu";
 
@@ -30,7 +33,14 @@ interface FileEntry {
 interface Props {
 	projectPath: string;
 	onOpenInTerminal?: (path: string) => void;
-	onOpenFile?: (filePath: string) => void;
+	onOpenFile?: (filePath: string, lineNumber?: number) => void;
+	onOpenFileInSplit?: (filePath: string, direction: "horizontal" | "vertical") => void;
+}
+
+interface SearchResult {
+	filePath: string;
+	lineNumber: number;
+	lineContent: string;
 }
 
 function parentDir(filePath: string): string {
@@ -143,6 +153,14 @@ function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, o
 				style={{ paddingLeft: `${depth * 12 + 8}px` }}
 				onClick={handleClick}
 				onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu?.(e, entry); }}
+				draggable={!entry.isDir}
+				onDragStart={(e) => {
+					if (!entry.isDir) {
+						e.dataTransfer.setData("text/plain", entry.path);
+						e.dataTransfer.setData("application/connexio-file", entry.path);
+						e.dataTransfer.effectAllowed = "copy";
+					}
+				}}
 			>
 				{entry.isDir ? (
 					<>
@@ -205,15 +223,46 @@ function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, o
 	);
 }
 
+// ─── Search highlight helper ─────────────────────────────────────────────────
+
+function highlightMatch(text: string, query: string, caseSensitive: boolean) {
+	if (!query) return text;
+	const flags = caseSensitive ? "g" : "gi";
+	const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const parts = text.split(new RegExp(`(${escaped})`, flags));
+	return (
+		<>
+			{parts.map((part, i) => {
+				const isMatch = caseSensitive
+					? part === query
+					: part.toLowerCase() === query.toLowerCase();
+				return isMatch ? (
+					<span key={i} className="bg-connexio-accent/30 text-connexio-accent font-semibold">{part}</span>
+				) : (
+					<span key={i}>{part}</span>
+				);
+			})}
+		</>
+	);
+}
+
 // ─── Main File Explorer ──────────────────────────────────────────────────────
 
-export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile }: Props) {
+export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile, onOpenFileInSplit }: Props) {
 	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [showHidden, setShowHidden] = useState(false);
 	const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: FileEntry } | null>(null);
 	const [renamingPath, setRenamingPath] = useState<string | null>(null);
 	const [newItem, setNewItem] = useState<{ parent: string; type: "file" | "folder" } | null>(null);
+
+	// Search state
+	const [searchQuery, setSearchQuery] = useState("");
+	const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+	const [searching, setSearching] = useState(false);
+	const [searched, setSearched] = useState(false);
+	const [caseSensitive, setCaseSensitive] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	const refresh = useCallback(() => {
 		if (!projectPath) return;
@@ -223,6 +272,41 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 	}, [projectPath]);
 
 	useEffect(() => { refresh(); }, [refresh]);
+
+	// Reset search when project changes
+	useEffect(() => {
+		setSearchQuery("");
+		setSearchResults([]);
+		setSearched(false);
+	}, [projectPath]);
+
+	// ─── Search ─────────────────────────────────────────────────────────────
+
+	const handleSearch = useCallback(async () => {
+		const trimmed = searchQuery.trim();
+		if (!trimmed) return;
+		setSearching(true);
+		setSearched(true);
+		try {
+			const res = await invoke<SearchResult[]>("explorer_search_in_files", {
+				projectPath,
+				query: trimmed,
+				caseSensitive,
+				maxResults: 200,
+			});
+			setSearchResults(res);
+		} catch {
+			setSearchResults([]);
+		}
+		setSearching(false);
+	}, [searchQuery, projectPath, caseSensitive]);
+
+	const clearSearch = () => {
+		setSearchQuery("");
+		setSearchResults([]);
+		setSearched(false);
+		searchInputRef.current?.focus();
+	};
 
 	// ─── Actions ─────────────────────────────────────────────────────────────
 
@@ -271,13 +355,114 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 
 	const filteredEntries = showHidden ? entries : entries.filter((e) => !e.isHidden);
 
+	// Group search results by file
+	const grouped = searchResults.reduce<Record<string, SearchResult[]>>((acc, r) => {
+		if (!acc[r.filePath]) acc[r.filePath] = [];
+		acc[r.filePath].push(r);
+		return acc;
+	}, {});
+	const fileNameFromPath = (path: string) => path.replace(/\\/g, "/").split("/").pop() || path;
+	const relativePath = (path: string) => {
+		const normalized = path.replace(/\\/g, "/");
+		const base = projectPath.replace(/\\/g, "/");
+		return normalized.startsWith(base) ? normalized.slice(base.length + 1) : normalized;
+	};
+
 	return (
 		<div className="flex flex-col h-full overflow-hidden">
-			{/* Header */}
-			<div className="flex items-center justify-between px-3 py-2 border-b border-connexio-border">
-				<span className="text-[10px] font-semibold uppercase tracking-wider text-connexio-text-muted">
-					Explorer
-				</span>
+			{/* Search bar */}
+			<div className="px-2 pt-2 pb-1 border-b border-connexio-border flex-shrink-0">
+				<div className="flex items-center gap-1 bg-connexio-bg-tertiary rounded px-2 py-1">
+					<Search size={12} className="text-connexio-text-muted flex-shrink-0" />
+					<input
+						ref={searchInputRef}
+						type="text"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+						placeholder="Search in files..."
+						className="flex-1 bg-transparent text-xs text-connexio-text outline-none placeholder:text-connexio-text-muted/50"
+					/>
+					{searchQuery && (
+						<button onClick={clearSearch} className="p-0.5 rounded hover:bg-connexio-bg-secondary" type="button">
+							<X size={10} className="text-connexio-text-muted" />
+						</button>
+					)}
+				</div>
+				{searchQuery && (
+					<div className="flex items-center gap-2 mt-1">
+						<label className="flex items-center gap-1 text-[10px] text-connexio-text-muted cursor-pointer">
+							<input
+								type="checkbox"
+								checked={caseSensitive}
+								onChange={(e) => setCaseSensitive(e.target.checked)}
+								className="w-3 h-3 rounded border-connexio-border"
+							/>
+							Aa
+						</label>
+						<button
+							onClick={handleSearch}
+							disabled={!searchQuery.trim() || searching}
+							className="ml-auto px-2 py-0.5 text-[10px] rounded bg-connexio-accent/10 text-connexio-accent hover:bg-connexio-accent/20 disabled:opacity-40 transition-colors"
+							type="button"
+						>
+							{searching ? <Loader2 size={10} className="animate-spin" /> : "Search"}
+						</button>
+					</div>
+				)}
+			</div>
+
+			{/* Search results */}
+			{searched && (
+				<div className="border-b border-connexio-border max-h-[40%] overflow-y-auto flex-shrink-0">
+					{searching && (
+						<div className="flex items-center justify-center py-4 text-connexio-text-muted">
+							<Loader2 size={12} className="animate-spin mr-1.5" />
+							<span className="text-[11px]">Searching...</span>
+						</div>
+					)}
+					{!searching && searchResults.length === 0 && (
+						<div className="px-3 py-3 text-center text-[11px] text-connexio-text-muted">No results</div>
+					)}
+					{!searching && searchResults.length > 0 && (
+						<div className="py-1">
+							<div className="px-2 py-0.5 text-[10px] text-connexio-text-muted">
+								{searchResults.length} result{searchResults.length !== 1 ? "s" : ""} in {Object.keys(grouped).length} file{Object.keys(grouped).length !== 1 ? "s" : ""}
+							</div>
+							{Object.entries(grouped).map(([filePath, fileResults]) => (
+								<div key={filePath} className="mb-0.5">
+									<button
+										onClick={() => onOpenFile?.(filePath)}
+										className="w-full flex items-center gap-1.5 px-2 py-0.5 text-left hover:bg-connexio-bg-tertiary transition-colors"
+										type="button"
+									>
+										<FileCode size={11} className="text-connexio-accent flex-shrink-0" />
+										<span className="text-[11px] text-connexio-text font-medium truncate">{fileNameFromPath(filePath)}</span>
+										<span className="text-[10px] text-connexio-text-muted truncate ml-1">{relativePath(filePath)}</span>
+									</button>
+									{fileResults.map((r) => (
+										<button
+											key={`${r.filePath}:${r.lineNumber}`}
+											onClick={() => onOpenFile?.(r.filePath, r.lineNumber)}
+											className="w-full flex items-start gap-2 px-4 py-0.5 text-left hover:bg-connexio-bg-tertiary transition-colors"
+											type="button"
+										>
+											<span className="text-[10px] text-connexio-text-muted w-5 text-right flex-shrink-0 font-mono">{r.lineNumber}</span>
+											<span className="text-[11px] text-connexio-text-secondary truncate font-mono">
+												{highlightMatch(r.lineContent, searchQuery, caseSensitive)}
+											</span>
+										</button>
+									))}
+								</div>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* File tree header */}
+			<div className="flex items-center justify-between px-3 py-1.5 border-b border-connexio-border flex-shrink-0">
+				<span className="text-[10px] font-semibold uppercase tracking-wider text-connexio-text-muted">Files</span>
 				<div className="flex items-center gap-1">
 					<button onClick={() => setNewItem({ parent: projectPath, type: "file" })} className="p-0.5 rounded hover:bg-connexio-bg-tertiary" title="New File" type="button">
 						<FilePlus size={12} className="text-connexio-text-muted" />
@@ -351,6 +536,8 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 					onCopyPath={() => { navigator.clipboard.writeText(contextMenu.entry.path).catch(() => {}); setContextMenu(null); }}
 					onOpenInTerminal={() => { onOpenInTerminal?.(contextMenu.entry.isDir ? contextMenu.entry.path : parentDir(contextMenu.entry.path)); setContextMenu(null); }}
 					onOpenExternal={() => { handleOpenExternal(contextMenu.entry.path); setContextMenu(null); }}
+					onOpenInSplitRight={!contextMenu.entry.isDir && onOpenFileInSplit ? () => { onOpenFileInSplit(contextMenu.entry.path, "horizontal"); setContextMenu(null); } : undefined}
+					onOpenInSplitDown={!contextMenu.entry.isDir && onOpenFileInSplit ? () => { onOpenFileInSplit(contextMenu.entry.path, "vertical"); setContextMenu(null); } : undefined}
 				/>
 			)}
 		</div>

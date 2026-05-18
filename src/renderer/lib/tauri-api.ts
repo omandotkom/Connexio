@@ -116,6 +116,9 @@ export const project = {
 	update: (proj: Project): Promise<Project[]> =>
 		invoke("projects_update", { project: proj }),
 
+	reorder: (ids: string[]): Promise<Project[]> =>
+		invoke("projects_reorder", { ids }),
+
 	delete: (id: string): Promise<Project[]> =>
 		invoke("projects_delete", { id }),
 

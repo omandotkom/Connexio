@@ -48,6 +48,7 @@ pub fn run() {
             modules::projects::projects_list,
             modules::projects::projects_add,
             modules::projects::projects_update,
+            modules::projects::projects_reorder,
             modules::projects::projects_delete,
             // Settings
             modules::settings::settings_get,
@@ -133,11 +134,28 @@ pub fn run() {
             modules::explorer::explorer_new_file,
             modules::explorer::explorer_new_folder,
             modules::explorer::explorer_open_path,
+            modules::explorer::explorer_search_in_files,
         ])
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                let app = window.app_handle();
-                modules::pty::kill_all(app);
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // Give frontend a moment to flush workspace state
+                    // The frontend listens for beforeunload which fires when we close
+                    let app = window.app_handle().clone();
+                    let window_clone = window.clone();
+                    api.prevent_close();
+                    // Small delay to let IPC flush complete, then actually close
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        modules::pty::kill_all(&app);
+                        let _ = window_clone.destroy();
+                    });
+                }
+                tauri::WindowEvent::Destroyed => {
+                    let app = window.app_handle();
+                    modules::pty::kill_all(app);
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

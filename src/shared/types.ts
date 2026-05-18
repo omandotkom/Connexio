@@ -100,6 +100,16 @@ export interface WorkspaceTabState {
 	id: string;
 	label: string;
 	shell?: string;
+	type?: "terminal" | "editor" | "preview";
+	filePath?: string;
+	// Split persistence (recursive tree)
+	splitTree?: {
+		type: "leaf" | "branch";
+		id: string;
+		direction?: "horizontal" | "vertical";
+		children?: WorkspaceTabState["splitTree"][];
+		shell?: string;
+	};
 }
 
 // Full workspace state to persist

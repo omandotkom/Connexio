@@ -1,4 +1,4 @@
-import { Bot, FolderTree, GitBranch, Globe, ListTodo, PanelRightClose, Server } from "lucide-react";
+import { Bot, Columns2, FolderTree, GitBranch, Globe, ListTodo, PanelRightClose, Rows2, Server } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { AIChatPanel } from "./ai";
@@ -28,6 +28,7 @@ export default function Workspace() {
 		setActiveTerminalTab,
 		renameTerminalTab,
 		reorderTabs,
+		splitTerminal,
 	} = useProjectStore();
 
 	// Drag state
@@ -94,6 +95,76 @@ export default function Workspace() {
 		return () => window.removeEventListener("connexio:open-panel", handlePanelEvent);
 	}, []);
 
+	// Keyboard shortcuts
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const state = useProjectStore.getState();
+			const projId = state.activeProjectId;
+			if (!projId) return;
+			const currentTabs = state.workspaceTabs[projId] || [];
+			const currentActiveTabId = state.activeTabIds[projId];
+			if (!currentActiveTabId) return;
+			const currentTab = currentTabs.find((t) => t.id === currentActiveTabId);
+
+			// Ctrl+Shift+D = Split Right (new terminal pane)
+			if (e.ctrlKey && e.shiftKey && e.key === "D") {
+				e.preventDefault();
+				const activePaneId = currentTab?.splitLayout
+					? currentTab.splitLayout.activePaneId
+					: currentActiveTabId;
+				state.splitTerminal(projId, currentActiveTabId, activePaneId, "horizontal");
+			}
+			// Ctrl+Shift+E = Split Down
+			if (e.ctrlKey && e.shiftKey && e.key === "E") {
+				e.preventDefault();
+				const activePaneId = currentTab?.splitLayout
+					? currentTab.splitLayout.activePaneId
+					: currentActiveTabId;
+				state.splitTerminal(projId, currentActiveTabId, activePaneId, "vertical");
+			}
+			// Ctrl+T = New terminal tab
+			if (e.ctrlKey && !e.shiftKey && e.key === "t") {
+				e.preventDefault();
+				state.openTerminalTab(projId);
+			}
+			// Ctrl+W = Close current tab
+			if (e.ctrlKey && !e.shiftKey && e.key === "w") {
+				e.preventDefault();
+				if (currentTabs.length > 1) {
+					state.closeTerminalTab(projId, currentActiveTabId);
+				}
+			}
+			// Ctrl+` = Toggle side panel
+			if (e.ctrlKey && e.key === "`") {
+				e.preventDefault();
+				setShowSidePanel((prev) => !prev);
+			}
+			// Ctrl+Shift+F = Search in files (opens explorer with search)
+			if (e.ctrlKey && e.shiftKey && e.key === "F") {
+				e.preventDefault();
+				setSidePanelTab("explorer");
+				setShowSidePanel(true);
+			}
+			// Ctrl+Tab = Next tab
+			if (e.ctrlKey && e.key === "Tab" && !e.shiftKey) {
+				e.preventDefault();
+				const idx = currentTabs.findIndex((t) => t.id === currentActiveTabId);
+				const nextIdx = (idx + 1) % currentTabs.length;
+				state.setActiveTerminalTab(projId, currentTabs[nextIdx].id);
+			}
+			// Ctrl+Shift+Tab = Previous tab
+			if (e.ctrlKey && e.key === "Tab" && e.shiftKey) {
+				e.preventDefault();
+				const idx = currentTabs.findIndex((t) => t.id === currentActiveTabId);
+				const prevIdx = (idx - 1 + currentTabs.length) % currentTabs.length;
+				state.setActiveTerminalTab(projId, currentTabs[prevIdx].id);
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
+
 	if (!activeProjectId) return null;
 
 	const project = projects.find((p) => p.id === activeProjectId);
@@ -109,12 +180,16 @@ export default function Workspace() {
 
 	const handleDragOver = (index: number) => {
 		if (dragFromIndex === null || dragFromIndex === index) {
-			setDragOverIndex(null);
-			setDragSide(null);
+			if (dragOverIndex !== null) {
+				setDragOverIndex(null);
+				setDragSide(null);
+			}
 			return;
 		}
+		const newSide = dragFromIndex < index ? "right" : "left";
+		if (dragOverIndex === index && dragSide === newSide) return; // no change
 		setDragOverIndex(index);
-		setDragSide(dragFromIndex < index ? "right" : "left");
+		setDragSide(newSide);
 	};
 
 	const handleDragEnd = () => {
@@ -216,6 +291,34 @@ export default function Workspace() {
 					<Globe size={12} />
 				</button>
 
+				{/* Split buttons */}
+				{activeTab && (activeTab.terminalId || activeTab.splitLayout) && (
+					<>
+						<button
+							onClick={() => {
+								const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
+								splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
+							}}
+							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"
+							title="Split Right (Ctrl+Shift+D)"
+							type="button"
+						>
+							<Columns2 size={12} />
+						</button>
+						<button
+							onClick={() => {
+								const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
+								splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
+							}}
+							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"
+							title="Split Down (Ctrl+Shift+E)"
+							type="button"
+						>
+							<Rows2 size={12} />
+						</button>
+					</>
+				)}
+
 				{/* Side panel toggles */}
 				<div className="ml-auto flex items-center gap-0.5 flex-shrink-0">
 					<button
@@ -285,8 +388,16 @@ export default function Workspace() {
 			<div
 				ref={tabBarRef}
 				className="flex items-center h-9 bg-connexio-bg-secondary border-b border-connexio-border"
+				onContextMenu={(e) => e.preventDefault()}
 				onDragOver={handleTabBarDragOver}
 				onDrop={handleTabBarDrop}
+				onDragLeave={(e) => {
+					// Only clear if leaving the tab bar entirely (not entering a child)
+					if (!tabBarRef.current?.contains(e.relatedTarget as Node)) {
+						setDragOverIndex(null);
+						setDragSide(null);
+					}
+				}}
 			>
 				<div className="flex items-center flex-1 overflow-x-auto">
 					{tabs.map((tab, index) => (
@@ -305,8 +416,10 @@ export default function Workspace() {
 							onDragStart={handleDragStart}
 							onDragOver={handleDragOver}
 							onDragEnd={handleDragEnd}
+							onDrop={handleDragEnd}
 							isDragOver={dragOverIndex === index}
 							dragSide={dragOverIndex === index ? dragSide : null}
+							isDragging={dragFromIndex === index}
 						/>
 					))}
 
@@ -324,7 +437,36 @@ export default function Workspace() {
 			{/* Main content area */}
 			<div className="flex flex-1 overflow-hidden">
 				{/* Terminal / Editor / Preview Area */}
-				<div className="flex-1 relative overflow-hidden flex flex-col">
+				<div
+					className="flex-1 relative overflow-hidden flex flex-col"
+					data-file-drop-zone=""
+					onDragOver={(e) => {
+						if (e.dataTransfer.types.includes("application/connexio-file") || e.dataTransfer.types.includes("Files")) {
+							e.preventDefault();
+							e.dataTransfer.dropEffect = "copy";
+						}
+					}}
+					onDrop={(e) => {
+						e.preventDefault();
+						if (!activeProjectId) return;
+						// File from sidebar explorer
+						const connexioFile = e.dataTransfer.getData("application/connexio-file");
+						if (connexioFile) {
+							openEditorTab(activeProjectId, connexioFile);
+							return;
+						}
+						// File from OS
+						const files = e.dataTransfer.files;
+						if (files.length > 0) {
+							for (let i = 0; i < files.length; i++) {
+								const filePath = (files[i] as any).path;
+								if (filePath) {
+									openEditorTab(activeProjectId, filePath);
+								}
+							}
+						}
+					}}
+				>
 					{/* Web Preview (takes over entire area) */}
 					{showPreview && (
 						<WebPreview onClose={() => setShowPreview(false)} />
@@ -332,15 +474,17 @@ export default function Workspace() {
 
 					{/* Editor tab (shown when active tab is editor type) */}
 					{!showPreview && activeTab?.type === "editor" && activeTab.filePath && (
-						<CodeEditor
-							key={activeTab.filePath}
-							filePath={activeTab.filePath}
-							onClose={() => closeTerminalTab(activeProjectId, activeTab.id)}
-						/>
+						<div className="flex-1 min-h-0">
+							<CodeEditor
+								key={activeTab.filePath}
+								filePath={activeTab.filePath}
+								onClose={() => closeTerminalTab(activeProjectId, activeTab.id)}
+							/>
+						</div>
 					)}
 
 					{/* Terminal (shown when active tab is terminal type) */}
-					<div className={showPreview || activeTab?.type === "editor" ? "hidden" : "w-full h-full"}>
+					<div className={showPreview || activeTab?.type === "editor" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
 						<TerminalLayer />
 					</div>
 				</div>
@@ -349,18 +493,16 @@ export default function Workspace() {
 				{showSidePanel && (
 					<div
 						ref={panelRef}
-						className="bg-connexio-bg-secondary border-l border-connexio-border flex flex-col relative"
-						style={{ width: sidePanelTab === "source" || sidePanelTab === "explorer" || sidePanelTab === "ai" ? panelWidth : 240 }}
+						className="bg-connexio-bg-secondary border-l border-connexio-border flex flex-col relative overflow-hidden"
+						style={{ width: panelWidth }}
 					>
 						{/* Resize handle */}
-						{(sidePanelTab === "source" || sidePanelTab === "explorer" || sidePanelTab === "ai") && (
-							<div
-								className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-connexio-accent/30 active:bg-connexio-accent/50 transition-colors z-10"
-								onMouseDown={handleResizeStart}
-							/>
-						)}
+						<div
+							className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-connexio-accent/30 active:bg-connexio-accent/50 transition-colors z-10"
+							onMouseDown={handleResizeStart}
+						/>
 						{/* Panel header with tabs */}
-						<div className="flex items-center border-b border-connexio-border">
+						<div className="flex items-center border-b border-connexio-border flex-shrink-0 overflow-x-auto">
 							<button
 								onClick={() => setSidePanelTab("ai")}
 								className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
@@ -434,14 +576,22 @@ export default function Workspace() {
 						</div>
 
 						{/* Panel content */}
-						{sidePanelTab === "ai" && <AIChatPanel />}
+						<div className="flex-1 min-h-0 overflow-hidden">
+							{sidePanelTab === "ai" && <AIChatPanel />}
 						{sidePanelTab === "explorer" && (
 							<FileExplorer
 								projectPath={project.path}
 								onOpenInTerminal={(path) => {
 									openTerminalTab(activeProjectId, `Terminal (${path.split(/[\\/]/).pop()})`);
 								}}
-								onOpenFile={(filePath) => openEditorTab(activeProjectId, filePath)}
+								onOpenFile={(filePath, lineNumber) => openEditorTab(activeProjectId, filePath, lineNumber)}
+								onOpenFileInSplit={(filePath, direction) => {
+									if (!activeTab) return;
+									const paneId = activeTab.splitLayout
+										? activeTab.splitLayout.activePaneId
+										: activeTab.id;
+									useProjectStore.getState().openEditorInSplit(activeProjectId, activeTab.id, paneId, direction, filePath);
+								}}
 							/>
 						)}
 						{sidePanelTab === "source" && (
@@ -454,24 +604,22 @@ export default function Workspace() {
 								onRunCommand={handleRunCommand}
 							/>
 						)}
-						{sidePanelTab === "ssh" && (
-							<SSHPanel
-								projectId={activeProjectId}
-								onConnect={handleSSHConnect}
-							/>
-						)}
+							{sidePanelTab === "ssh" && (
+								<SSHPanel
+									projectId={activeProjectId}
+									onConnect={handleSSHConnect}
+								/>
+							)}
+						</div>
 					</div>
 				)}
 			</div>
 
-			{/* Close tab confirmation dialog */}
+			{/* Close tab confirmation */}
 			{closeConfirmTabId && (
 				<ConfirmDialog
-					title="Close Terminal"
-					message="Are you sure you want to close this terminal? Any running process will be terminated."
-					confirmLabel="Close"
-					cancelLabel="Cancel"
-					variant="warning"
+					title="Close Tab"
+					message="Close this terminal tab? Any running processes will be terminated."
 					onConfirm={confirmCloseTab}
 					onCancel={cancelCloseTab}
 				/>

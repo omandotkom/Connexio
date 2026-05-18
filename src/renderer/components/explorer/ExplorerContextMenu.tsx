@@ -1,9 +1,11 @@
 import {
+	Columns2,
 	Copy,
 	Edit3,
 	ExternalLink,
 	FilePlus,
 	FolderPlus,
+	Rows2,
 	Terminal,
 	Trash2,
 } from "lucide-react";
@@ -21,6 +23,8 @@ interface Props {
 	onCopyPath: () => void;
 	onOpenInTerminal: () => void;
 	onOpenExternal: () => void;
+	onOpenInSplitRight?: () => void;
+	onOpenInSplitDown?: () => void;
 }
 
 export default function ExplorerContextMenu({
@@ -35,6 +39,8 @@ export default function ExplorerContextMenu({
 	onCopyPath,
 	onOpenInTerminal,
 	onOpenExternal,
+	onOpenInSplitRight,
+	onOpenInSplitDown,
 }: Props) {
 	const menuRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +62,7 @@ export default function ExplorerContextMenu({
 	}, [onClose]);
 
 	const width = 180;
-	const height = isDir ? 250 : 170;
+	const height = isDir ? 250 : 230;
 	const left = Math.min(x, window.innerWidth - width - 8);
 	const top = Math.min(y, window.innerHeight - height - 8);
 
@@ -99,6 +105,17 @@ export default function ExplorerContextMenu({
 					<MenuItem icon={FilePlus} label="New File" onClick={onNewFile} />
 					<MenuItem icon={FolderPlus} label="New Folder" onClick={onNewFolder} />
 					<MenuItem icon={Terminal} label="Open in Terminal" onClick={onOpenInTerminal} />
+					<div className="h-px bg-connexio-border my-1" />
+				</>
+			)}
+			{!isDir && (onOpenInSplitRight || onOpenInSplitDown) && (
+				<>
+					{onOpenInSplitRight && (
+						<MenuItem icon={Columns2} label="Open in Split Right" onClick={onOpenInSplitRight} />
+					)}
+					{onOpenInSplitDown && (
+						<MenuItem icon={Rows2} label="Open in Split Down" onClick={onOpenInSplitDown} />
+					)}
 					<div className="h-px bg-connexio-border my-1" />
 				</>
 			)}

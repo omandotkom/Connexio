@@ -224,3 +224,112 @@ pub fn explorer_new_folder(_app: AppHandle, dir_path: String) -> Result<(), Stri
 pub fn explorer_open_path(_app: AppHandle, target_path: String) -> Result<(), String> {
     opener::open(&target_path).map_err(|e| format!("Failed to open path: {}", e))
 }
+
+/// Search for text in files within a directory (grep-like)
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    pub file_path: String,
+    pub line_number: usize,
+    pub line_content: String,
+}
+
+#[tauri::command]
+pub fn explorer_search_in_files(
+    _app: AppHandle,
+    project_path: String,
+    query: String,
+    case_sensitive: Option<bool>,
+    max_results: Option<usize>,
+) -> Result<Vec<SearchResult>, String> {
+    let case_sensitive = case_sensitive.unwrap_or(false);
+    let max_results = max_results.unwrap_or(200);
+    let mut results = Vec::new();
+    let query_lower = if !case_sensitive { query.to_lowercase() } else { String::new() };
+
+    search_dir(
+        Path::new(&project_path),
+        &query,
+        &query_lower,
+        case_sensitive,
+        max_results,
+        &mut results,
+    );
+
+    Ok(results)
+}
+
+/// Binary file extensions to skip
+const BINARY_EXTENSIONS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp",
+    "mp3", "mp4", "wav", "avi", "mkv", "mov",
+    "zip", "tar", "gz", "rar", "7z",
+    "exe", "dll", "so", "dylib", "bin",
+    "pdf", "doc", "docx", "xls", "xlsx",
+    "woff", "woff2", "ttf", "otf", "eot",
+    "lock", "map",
+];
+
+fn is_binary_file(name: &str) -> bool {
+    if let Some(ext) = name.rsplit('.').next() {
+        BINARY_EXTENSIONS.contains(&ext.to_lowercase().as_str())
+    } else {
+        false
+    }
+}
+
+fn search_dir(
+    dir: &Path,
+    query: &str,
+    query_lower: &str,
+    case_sensitive: bool,
+    max_results: usize,
+    results: &mut Vec<SearchResult>,
+) {
+    if results.len() >= max_results {
+        return;
+    }
+
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        if results.len() >= max_results {
+            return;
+        }
+
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if should_ignore(&name) || is_hidden(&name) {
+            continue;
+        }
+
+        if path.is_dir() {
+            search_dir(&path, query, query_lower, case_sensitive, max_results, results);
+        } else if path.is_file() && !is_binary_file(&name) {
+            // Read file and search line by line
+            if let Ok(content) = fs::read_to_string(&path) {
+                for (idx, line) in content.lines().enumerate() {
+                    if results.len() >= max_results {
+                        return;
+                    }
+                    let matches = if case_sensitive {
+                        line.contains(query)
+                    } else {
+                        line.to_lowercase().contains(query_lower)
+                    };
+                    if matches {
+                        results.push(SearchResult {
+                            file_path: path.to_string_lossy().to_string(),
+                            line_number: idx + 1,
+                            line_content: line.chars().take(300).collect(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+}

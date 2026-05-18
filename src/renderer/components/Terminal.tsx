@@ -1,6 +1,8 @@
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
+import { Search, X as XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalThemeColors } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -52,6 +54,7 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<XTerm | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
+	const searchAddonRef = useRef<SearchAddon | null>(null);
 	// Global disposed flag — checked by ALL operations on this terminal
 	const disposedRef = useRef(false);
 	// Track visibility so the write batcher can check it
@@ -59,6 +62,11 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 	visibleRef.current = isVisible ?? false;
 	const { currentTheme } = useThemeStore();
 	const { settings } = useSettingsStore();
+
+	// Search bar state
+	const [showSearch, setShowSearch] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	// Context menu state
 	const [contextMenu, setContextMenu] = useState<{
@@ -141,13 +149,16 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		});
 
 		const fitAddon = new FitAddon();
+		const searchAddon = new SearchAddon();
 		xterm.loadAddon(fitAddon);
+		xterm.loadAddon(searchAddon);
 		xterm.loadAddon(new WebLinksAddon());
 
 		xterm.open(containerRef.current);
 
 		xtermRef.current = xterm;
 		fitAddonRef.current = fitAddon;
+		searchAddonRef.current = searchAddon;
 
 		// --- Write batcher ---
 		// Data from PTY is buffered and flushed in batches.
@@ -279,6 +290,7 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			}
 			xtermRef.current = null;
 			fitAddonRef.current = null;
+			searchAddonRef.current = null;
 		};
 	}, [terminalId]);
 
@@ -309,6 +321,40 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		return () => clearTimeout(timer);
 	}, [isVisible, terminalId]);
 
+	// Effect: explicit fit requests from split layout changes.
+	// ResizeObserver is not always enough when panes collapse/expand while the
+	// terminal remains mounted and visible, so split actions dispatch this event.
+	useEffect(() => {
+		let fitTimer: ReturnType<typeof setTimeout> | null = null;
+		let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+
+		const handleFitRequest = () => {
+			if (!isVisible || disposedRef.current) return;
+
+			// Debounce: cancel previous pending fit, schedule a new one
+			if (fitTimer !== null) clearTimeout(fitTimer);
+			if (trailingTimer !== null) clearTimeout(trailingTimer);
+
+			// Immediate fit for responsiveness
+			safeFit();
+
+			// Trailing fit to catch final layout after animations/transitions
+			trailingTimer = setTimeout(() => {
+				trailingTimer = null;
+				safeFit();
+			}, 150);
+		};
+
+		window.addEventListener("resize", handleFitRequest);
+		window.addEventListener("connexio:terminal-fit", handleFitRequest);
+		return () => {
+			window.removeEventListener("resize", handleFitRequest);
+			window.removeEventListener("connexio:terminal-fit", handleFitRequest);
+			if (fitTimer !== null) clearTimeout(fitTimer);
+			if (trailingTimer !== null) clearTimeout(trailingTimer);
+		};
+	}, [isVisible, terminalId]);
+
 	// Effect: update settings
 	useEffect(() => {
 		if (disposedRef.current || !xtermRef.current || !settings) return;
@@ -326,11 +372,91 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		}
 	}, [settings]);
 
+	// Terminal search handlers
+	const handleSearchOpen = useCallback(() => {
+		setShowSearch(true);
+		setTimeout(() => searchInputRef.current?.focus(), 50);
+	}, []);
+
+	const handleSearchClose = useCallback(() => {
+		setShowSearch(false);
+		setSearchQuery("");
+		searchAddonRef.current?.clearDecorations();
+		xtermRef.current?.focus();
+	}, []);
+
+	const handleSearchNext = useCallback(() => {
+		if (searchQuery && searchAddonRef.current) {
+			searchAddonRef.current.findNext(searchQuery);
+		}
+	}, [searchQuery]);
+
+	const handleSearchPrev = useCallback(() => {
+		if (searchQuery && searchAddonRef.current) {
+			searchAddonRef.current.findPrevious(searchQuery);
+		}
+	}, [searchQuery]);
+
+	// Ctrl+F to open search
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => {
+			if (!isVisible) return;
+			if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+				e.preventDefault();
+				e.stopPropagation();
+				handleSearchOpen();
+			}
+		};
+		window.addEventListener("keydown", handler, true);
+		return () => window.removeEventListener("keydown", handler, true);
+	}, [isVisible, handleSearchOpen]);
+
+	// Auto-search as user types
+	useEffect(() => {
+		if (!showSearch || !searchAddonRef.current) return;
+		if (searchQuery) {
+			searchAddonRef.current.findNext(searchQuery);
+		} else {
+			searchAddonRef.current.clearDecorations();
+		}
+	}, [searchQuery, showSearch]);
+
 	return (
-		<>
+		<div className="relative w-full h-full">
+			{/* Search bar */}
+			{showSearch && (
+				<div className="absolute top-1 right-1 z-20 flex items-center gap-1 px-2 py-1 bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-lg">
+					<Search size={11} className="text-connexio-text-muted flex-shrink-0" />
+					<input
+						ref={searchInputRef}
+						type="text"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								e.shiftKey ? handleSearchPrev() : handleSearchNext();
+							}
+							if (e.key === "Escape") handleSearchClose();
+						}}
+						className="w-[160px] px-1.5 py-0.5 text-xs bg-connexio-bg-tertiary text-connexio-text border border-connexio-border rounded outline-none focus:border-connexio-accent"
+						placeholder="Search..."
+					/>
+					<button onClick={handleSearchPrev} className="p-0.5 rounded hover:bg-connexio-bg-tertiary" title="Previous (Shift+Enter)" type="button">
+						<span className="text-[10px] text-connexio-text-muted">↑</span>
+					</button>
+					<button onClick={handleSearchNext} className="p-0.5 rounded hover:bg-connexio-bg-tertiary" title="Next (Enter)" type="button">
+						<span className="text-[10px] text-connexio-text-muted">↓</span>
+					</button>
+					<button onClick={handleSearchClose} className="p-0.5 rounded hover:bg-connexio-bg-tertiary" title="Close (Esc)" type="button">
+						<XIcon size={11} className="text-connexio-text-muted" />
+					</button>
+				</div>
+			)}
+
 			<div
 				ref={containerRef}
 				className="terminal-container w-full h-full bg-connexio-bg"
+				data-custom-context-menu=""
 			/>
 			{contextMenu && (
 				<TerminalContextMenu
@@ -342,6 +468,6 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 					onClose={closeContextMenu}
 				/>
 			)}
-		</>
+		</div>
 	);
 }

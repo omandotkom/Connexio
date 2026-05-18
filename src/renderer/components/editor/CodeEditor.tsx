@@ -9,20 +9,41 @@ import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { rust } from "@codemirror/lang-rust";
 import { Save, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useThemeStore } from "../../stores/themeStore";
 
-const connexioDarkTheme = EditorView.theme({
-	"&": { backgroundColor: "#0f1117", color: "#e2e8f0", height: "100%", fontSize: "12px" },
-	".cm-content": { fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace", caretColor: "#7c3aed" },
-	".cm-cursor": { borderLeftColor: "#7c3aed" },
-	".cm-activeLine": { backgroundColor: "#1e203020" },
-	".cm-activeLineGutter": { backgroundColor: "#1e203040" },
-	".cm-gutters": { backgroundColor: "#0f1117", color: "#64748b", border: "none", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px" },
-	".cm-scroller": { overflow: "auto" },
-	"&.cm-focused .cm-selectionBackground, .cm-selectionBackground": { backgroundColor: "#7c3aed30" },
-	".cm-selectionMatch": { backgroundColor: "#7c3aed20" },
-}, { dark: true });
+function buildEditorTheme(appTheme: { colors: any; terminal: any } | null) {
+	if (!appTheme) {
+		// Fallback dark theme
+		return EditorView.theme({
+			"&": { backgroundColor: "#0f1117", color: "#e2e8f0", height: "100%", fontSize: "12px" },
+			".cm-content": { fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace", caretColor: "#7c3aed" },
+			".cm-cursor": { borderLeftColor: "#7c3aed" },
+			".cm-activeLine": { backgroundColor: "#1e203020" },
+			".cm-activeLineGutter": { backgroundColor: "#1e203040" },
+			".cm-gutters": { backgroundColor: "#0f1117", color: "#64748b", border: "none", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px" },
+			".cm-scroller": { overflow: "auto" },
+			"&.cm-focused .cm-selectionBackground, .cm-selectionBackground": { backgroundColor: "#7c3aed30" },
+			".cm-selectionMatch": { backgroundColor: "#7c3aed20" },
+		}, { dark: true });
+	}
+
+	const { colors, terminal } = appTheme;
+	const isDark = appTheme && (appTheme as any).type !== "light";
+
+	return EditorView.theme({
+		"&": { backgroundColor: terminal.background, color: terminal.foreground, height: "100%", fontSize: "12px" },
+		".cm-content": { fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace", caretColor: colors.accentColor },
+		".cm-cursor": { borderLeftColor: colors.accentColor },
+		".cm-activeLine": { backgroundColor: `${colors.bgTertiary}40` },
+		".cm-activeLineGutter": { backgroundColor: `${colors.bgTertiary}60` },
+		".cm-gutters": { backgroundColor: terminal.background, color: colors.textMuted, border: "none", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px" },
+		".cm-scroller": { overflow: "auto" },
+		"&.cm-focused .cm-selectionBackground, .cm-selectionBackground": { backgroundColor: `${colors.accentColor}30` },
+		".cm-selectionMatch": { backgroundColor: `${colors.accentColor}20` },
+	}, { dark: isDark !== false });
+}
 
 interface Props {
 	filePath: string;
@@ -54,6 +75,10 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 	const originalContentRef = useRef("");
 	const filePathRef = useRef(filePath);
 	filePathRef.current = filePath;
+	const { currentTheme } = useThemeStore();
+
+	// Memoize editor theme based on current app theme
+	const editorTheme = useMemo(() => buildEditorTheme(currentTheme), [currentTheme]);
 
 	// Use ref so the keydown handler always calls the latest save logic
 	const saveRef = useRef<() => Promise<void>>(async () => {});
@@ -99,6 +124,25 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		return () => window.removeEventListener("keydown", handler, true);
 	}, []);
 
+	// Listen for goto-line events from search results
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const detail = (e as CustomEvent).detail;
+			if (detail?.filePath === filePath && detail?.lineNumber && viewRef.current) {
+				const view = viewRef.current;
+				const line = view.state.doc.line(Math.min(detail.lineNumber, view.state.doc.lines));
+				view.dispatch({
+					selection: { anchor: line.from },
+					scrollIntoView: true,
+					effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+				});
+				view.focus();
+			}
+		};
+		window.addEventListener("connexio:editor-goto-line", handler);
+		return () => window.removeEventListener("connexio:editor-goto-line", handler);
+	}, [filePath]);
+
 	// Load file and create editor
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -125,7 +169,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						history(),
 						keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
 						getLanguageExtension(filePath),
-						connexioDarkTheme,
+						editorTheme,
 						EditorView.updateListener.of((update) => {
 							if (update.docChanged) {
 								setIsDirty(true);
@@ -146,7 +190,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 				viewRef.current = null;
 			}
 		};
-	}, [filePath]);
+	}, [filePath, editorTheme]);
 
 	return (
 		<div className="flex flex-col h-full">

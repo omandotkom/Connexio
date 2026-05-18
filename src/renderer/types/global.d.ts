@@ -24,6 +24,7 @@ interface ConnexioAPI {
 		update: (
 			project: import("../../shared/types").Project,
 		) => Promise<import("../../shared/types").Project>;
+		reorder: (ids: string[]) => Promise<import("../../shared/types").Project[]>;
 		delete: (id: string) => Promise<boolean>;
 		selectDir: () => Promise<string | null>;
 	};

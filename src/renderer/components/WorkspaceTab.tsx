@@ -1,5 +1,5 @@
-import { GripVertical, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { GripVertical, Pencil, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface TabProps {
 	id: string;
@@ -13,8 +13,10 @@ interface TabProps {
 	onDragStart: (index: number) => void;
 	onDragOver: (index: number) => void;
 	onDragEnd: () => void;
+	onDrop: () => void;
 	isDragOver: boolean;
 	dragSide: "left" | "right" | null;
+	isDragging: boolean;
 }
 
 export default function WorkspaceTab({
@@ -29,13 +31,18 @@ export default function WorkspaceTab({
 	onDragStart,
 	onDragOver,
 	onDragEnd,
+	onDrop,
 	isDragOver,
 	dragSide,
+	isDragging,
 }: TabProps) {
 	const [isEditing, setIsEditing] = useState(false);
 	const [editValue, setEditValue] = useState(label);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const tabRef = useRef<HTMLDivElement>(null);
+
+	// Context menu state
+	const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
 	// Focus input when entering edit mode
 	useEffect(() => {
@@ -44,6 +51,31 @@ export default function WorkspaceTab({
 			inputRef.current.select();
 		}
 	}, [isEditing]);
+
+	// Close context menu on outside click
+	useEffect(() => {
+		if (!contextMenu) return;
+		const handleClick = (e: MouseEvent) => {
+			// Don't close if clicking inside the context menu
+			const target = e.target as HTMLElement;
+			if (target.closest("[data-tab-context-menu]")) return;
+			setContextMenu(null);
+		};
+		// Use setTimeout to avoid the same click that opened the menu from closing it
+		const timer = setTimeout(() => {
+			document.addEventListener("mousedown", handleClick);
+		}, 0);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener("mousedown", handleClick);
+		};
+	}, [contextMenu]);
+
+	const handleContextMenu = useCallback((e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setContextMenu({ x: e.clientX, y: e.clientY });
+	}, []);
 
 	const commitRename = () => {
 		const trimmed = editValue.trim();
@@ -92,14 +124,15 @@ export default function WorkspaceTab({
 			tabIndex={0}
 			aria-selected={isActive}
 			draggable={!isEditing}
-			className={`relative group flex items-center gap-1 px-1 h-9 border-r border-connexio-border cursor-pointer transition-colors min-w-0 max-w-[200px] select-none ${
+			className={`relative group flex items-center gap-1 px-1 h-9 min-w-[100px] max-w-[200px] border-r border-connexio-border cursor-pointer transition-colors select-none ${
 				isActive
 					? "bg-connexio-bg border-b-2 border-b-connexio-accent"
 					: "hover:bg-connexio-bg-tertiary"
-			} ${dragIndicatorClass}`}
+			} ${dragIndicatorClass} ${isDragging ? "opacity-40" : ""}`}
 			onClick={() => {
 				if (!isEditing) onSelect();
 			}}
+			onContextMenu={handleContextMenu}
 			onKeyDown={(e) => {
 				if (e.key === "Enter" || e.key === " ") {
 					e.preventDefault();
@@ -114,7 +147,7 @@ export default function WorkspaceTab({
 			onDragStart={(e) => {
 				e.dataTransfer.effectAllowed = "move";
 				e.dataTransfer.setData("text/plain", id);
-				// Make drag image slightly transparent
+				e.dataTransfer.setData("application/connexio-tab", id);
 				if (tabRef.current) {
 					e.dataTransfer.setDragImage(tabRef.current, 0, 0);
 				}
@@ -125,6 +158,11 @@ export default function WorkspaceTab({
 				e.dataTransfer.dropEffect = "move";
 				onDragOver(index);
 			}}
+			onDrop={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				onDrop();
+			}}
 			onDragEnd={() => {
 				onDragEnd();
 			}}
@@ -134,7 +172,7 @@ export default function WorkspaceTab({
 				<GripVertical size={10} className="text-connexio-text-muted" />
 			</div>
 
-			{/* Label or input */}
+			{/* Label or input — takes remaining space */}
 			{isEditing ? (
 				<input
 					ref={inputRef}
@@ -145,12 +183,12 @@ export default function WorkspaceTab({
 					onKeyDown={handleInputKeyDown}
 					onClick={(e) => e.stopPropagation()}
 					onMouseDown={(e) => e.stopPropagation()}
-					className="text-xs bg-connexio-bg-tertiary text-connexio-text border border-connexio-accent rounded px-1 py-0.5 outline-none min-w-[60px] max-w-[140px] w-full"
+					className="flex-1 text-xs bg-connexio-bg-tertiary text-connexio-text border border-connexio-accent rounded px-1 py-0.5 outline-none min-w-0"
 					maxLength={30}
 				/>
 			) : (
 				<span
-					className={`text-xs truncate px-1 ${
+					className={`flex-1 text-xs truncate px-1 ${
 						isActive ? "text-connexio-text" : "text-connexio-text-secondary"
 					}`}
 					onDoubleClick={handleDoubleClick}
@@ -160,19 +198,78 @@ export default function WorkspaceTab({
 				</span>
 			)}
 
-			{/* Close button */}
+			{/* Close button — always pinned to the right */}
 			{canClose && !isEditing && (
 				<button
 					onClick={(e) => {
 						e.stopPropagation();
 						onClose();
 					}}
-					className="flex-shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/20 transition-all"
+					className="flex-shrink-0 ml-auto opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/20 transition-all"
 					type="button"
 				>
 					<X size={10} className="text-connexio-text-muted" />
 				</button>
 			)}
+
+			{/* Context Menu */}
+			{contextMenu && (
+				<TabContextMenu
+					x={contextMenu.x}
+					y={contextMenu.y}
+					onRename={() => {
+						setContextMenu(null);
+						setEditValue(label);
+						setIsEditing(true);
+					}}
+				/>
+			)}
+		</div>
+	);
+}
+
+// === Tab Context Menu ===
+
+function TabContextMenu({
+	x,
+	y,
+	onRename,
+}: {
+	x: number;
+	y: number;
+	onRename: () => void;
+}) {
+	const menuRef = useRef<HTMLDivElement>(null);
+
+	// Adjust position if menu would overflow viewport
+	const [pos, setPos] = useState({ x, y });
+	useEffect(() => {
+		if (!menuRef.current) return;
+		const rect = menuRef.current.getBoundingClientRect();
+		const newX = x + rect.width > window.innerWidth ? window.innerWidth - rect.width - 4 : x;
+		const newY = y + rect.height > window.innerHeight ? window.innerHeight - rect.height - 4 : y;
+		setPos({ x: newX, y: newY });
+	}, [x, y]);
+
+	return (
+		<div
+			ref={menuRef}
+			data-tab-context-menu=""
+			className="fixed z-[200] min-w-[140px] py-1 bg-connexio-bg-secondary border border-connexio-border rounded-md shadow-xl"
+			style={{ top: pos.y, left: pos.x }}
+			onMouseDown={(e) => e.stopPropagation()}
+			onClick={(e) => e.stopPropagation()}
+			onContextMenu={(e) => e.preventDefault()}
+		>
+			<button
+				onClick={onRename}
+				className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-connexio-text hover:bg-connexio-bg-tertiary transition-colors text-left"
+				type="button"
+			>
+				<Pencil size={12} className="text-connexio-text-muted" />
+				Rename
+				<span className="ml-auto text-[10px] text-connexio-text-muted">F2</span>
+			</button>
 		</div>
 	);
 }

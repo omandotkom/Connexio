@@ -11,12 +11,24 @@ fn workspace_file(app: &AppHandle) -> PathBuf {
     data_dir(app).join("workspace.json")
 }
 
+// === Workspace Tab State ===
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceTabState {
     pub id: String,
     pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub shell: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    pub tab_type: Option<String>, // "terminal" | "editor" | "preview"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    /// Split layout tree — stored as opaque JSON to avoid frontend/backend struct drift
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "splitTree")]
+    pub split_tree: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
