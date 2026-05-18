@@ -135,7 +135,7 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			fontSize: settings?.fontSize || 13,
 			fontFamily:
 				settings?.fontFamily ||
-				"'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
+				"'JetBrainsMono Nerd Font', 'CaskaydiaCove Nerd Font', 'FiraCode Nerd Font', 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
 			cursorBlink: settings?.cursorBlink ?? false,
 			cursorStyle: settings?.cursorStyle || "bar",
 			scrollback: clampScrollback(settings?.scrollback),

@@ -28,7 +28,7 @@ impl Default for AppSettings {
         Self {
             default_shell: String::new(),
             font_size: 13,
-            font_family: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace".to_string(),
+            font_family: "'JetBrainsMono Nerd Font', 'CaskaydiaCove Nerd Font', 'FiraCode Nerd Font', 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace".to_string(),
             cursor_style: "bar".to_string(),
             cursor_blink: false,
             scrollback: 1000,

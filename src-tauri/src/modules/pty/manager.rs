@@ -93,6 +93,11 @@ pub fn terminal_create(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Connexio");
+    // Hint for oh-my-posh / Starship to use plain prompt if Nerd Font is missing
+    cmd.env("CONNEXIO_TERMINAL", "1");
+    // Starship: disable if user hasn't configured Nerd Font
+    // Users can remove this by setting STARSHIP_SHELL in their profile
+    cmd.env("STARSHIP_CONFIG", std::env::var("STARSHIP_CONFIG").unwrap_or_default());
 
     // Inject notification server port for AI agent hooks
     if let Some(notif_state) = app.try_state::<crate::modules::notification::NotificationState>() {
