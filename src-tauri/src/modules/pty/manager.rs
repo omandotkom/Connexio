@@ -71,8 +71,25 @@ pub fn terminal_create(
     // Determine shell
     let shell_path = shell.unwrap_or_else(|| default_shell());
 
-    // Build command
+    // Build command — detect PowerShell for shell integration
+    let shell_lower = shell_path.replace('\\', "/").to_lowercase();
+    let is_powershell = shell_lower.contains("pwsh") || shell_lower.contains("powershell");
+
     let mut cmd = CommandBuilder::new(&shell_path);
+
+    // For PowerShell: inject init script that sets UTF-8 encoding
+    // then sources user profile (oh-my-posh, starship, etc.)
+    #[cfg(target_os = "windows")]
+    if is_powershell {
+        if let Some(profile_path) = find_shell_integration_profile() {
+            cmd.arg("-NoLogo");
+            cmd.arg("-NoExit");
+            cmd.arg("-ExecutionPolicy");
+            cmd.arg("Bypass");
+            cmd.arg("-File");
+            cmd.arg(profile_path.to_string_lossy().to_string());
+        }
+    }
 
     // Set working directory
     let cwd = if std::path::Path::new(&project_path).is_dir() {
@@ -93,11 +110,7 @@ pub fn terminal_create(
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Connexio");
-    // Hint for oh-my-posh / Starship to use plain prompt if Nerd Font is missing
     cmd.env("CONNEXIO_TERMINAL", "1");
-    // Starship: disable if user hasn't configured Nerd Font
-    // Users can remove this by setting STARSHIP_SHELL in their profile
-    cmd.env("STARSHIP_CONFIG", std::env::var("STARSHIP_CONFIG").unwrap_or_default());
 
     // Inject notification server port for AI agent hooks
     if let Some(notif_state) = app.try_state::<crate::modules::notification::NotificationState>() {
@@ -108,7 +121,6 @@ pub fn terminal_create(
 
     // Shell integration: set env vars for CWD reporting (OSC 7)
     // These are picked up by shell profile/init without visible injection
-    let shell_lower = shell_path.replace('\\', "/").to_lowercase();
     if shell_lower.contains("bash") {
         // Bash: PROMPT_COMMAND emits OSC 7
         cmd.env("PROMPT_COMMAND", r#"printf "\e]7;file://%s%s\a" "$HOSTNAME" "$PWD""#);
@@ -252,5 +264,32 @@ fn default_shell() -> String {
     {
         std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
     }
+}
+
+/// Find the shell integration profile.ps1 for PowerShell
+#[cfg(target_os = "windows")]
+fn find_shell_integration_profile() -> Option<std::path::PathBuf> {
+    // 1. Check cache dir (written on first run)
+    let cache_dir = dirs::home_dir()?
+        .join(".cache")
+        .join("connexio")
+        .join("shell-integration");
+    let cached = cache_dir.join("profile.ps1");
+    
+    // Write/update the profile from embedded source
+    let profile_content = include_str!("../../scripts/profile.ps1");
+    let _ = std::fs::create_dir_all(&cache_dir);
+    
+    // Only write if content changed
+    let needs_write = std::fs::read_to_string(&cached)
+        .map(|existing| existing != profile_content)
+        .unwrap_or(true);
+    if needs_write {
+        if std::fs::write(&cached, profile_content).is_err() {
+            return None;
+        }
+    }
+    
+    Some(cached)
 }
 
