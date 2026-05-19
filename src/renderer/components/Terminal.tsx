@@ -184,12 +184,17 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			if (!containerRef.current?.contains(document.activeElement)) return;
 			e.preventDefault();
 			try {
+				// Check image FIRST — if clipboard has image, always send \x16
+				// so TUI apps (opencode) can read it themselves
+				const hasImage = await invoke<boolean>("clipboard_has_image");
+				if (hasImage) {
+					window.connexio.terminal.write(terminalId, "\x16");
+					return;
+				}
+				// No image — paste text normally
 				const text = await invoke<string | null>("clipboard_read_text");
 				if (text) {
 					window.connexio.terminal.write(terminalId, text);
-				} else {
-					// No text — send raw \x16 so TUI apps can read clipboard image
-					window.connexio.terminal.write(terminalId, "\x16");
 				}
 			} catch {
 				window.connexio.terminal.write(terminalId, "\x16");
