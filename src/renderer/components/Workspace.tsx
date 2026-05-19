@@ -40,6 +40,7 @@ export default function Workspace() {
 	const [closeConfirmTabId, setCloseConfirmTabId] = useState<string | null>(
 		null,
 	);
+	const [dirtyTabs, setDirtyTabs] = useState<Set<string>>(new Set());
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
 	// Resizable side panel
@@ -403,6 +404,8 @@ export default function Workspace() {
 							isActive={activeTabId === tab.id}
 							index={index}
 							canClose={tabs.length > 1}
+							isDirty={dirtyTabs.has(tab.id)}
+							tabType={tab.type}
 							onSelect={() => setActiveTerminalTab(activeProjectId, tab.id)}
 							onClose={() => handleCloseTab(tab.id)}
 							onRename={(newLabel) =>
@@ -469,6 +472,14 @@ export default function Workspace() {
 								key={activeTab.filePath}
 								filePath={activeTab.filePath}
 								onClose={() => closeTerminalTab(activeProjectId, activeTab.id)}
+								onDirtyChange={(dirty) => {
+									setDirtyTabs((prev) => {
+										const next = new Set(prev);
+										if (dirty) next.add(activeTab.id);
+										else next.delete(activeTab.id);
+										return next;
+									});
+								}}
 							/>
 						</div>
 					)}

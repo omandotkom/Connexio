@@ -1,4 +1,4 @@
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { javascript } from "@codemirror/lang-javascript";
@@ -15,7 +15,6 @@ import { useThemeStore } from "../../stores/themeStore";
 
 function buildEditorTheme(appTheme: { colors: any; terminal: any } | null) {
 	if (!appTheme) {
-		// Fallback dark theme
 		return EditorView.theme({
 			"&": { backgroundColor: "#0f1117", color: "#e2e8f0", height: "100%", fontSize: "12px" },
 			".cm-content": { fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace", caretColor: "#7c3aed" },
@@ -48,6 +47,8 @@ function buildEditorTheme(appTheme: { colors: any; terminal: any } | null) {
 interface Props {
 	filePath: string;
 	onClose: () => void;
+	/** Called when dirty state changes — used by parent to show tab indicator */
+	onDirtyChange?: (dirty: boolean) => void;
 }
 
 function getLanguageExtension(filePath: string) {
@@ -65,35 +66,37 @@ function getLanguageExtension(filePath: string) {
 	}
 }
 
-export default function CodeEditor({ filePath, onClose }: Props) {
+export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const viewRef = useRef<EditorView | null>(null);
+	const themeCompartment = useRef(new Compartment());
 	const [isDirty, setIsDirty] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [saveStatus, setSaveStatus] = useState<string | null>(null);
+	const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 	const originalContentRef = useRef("");
 	const filePathRef = useRef(filePath);
 	filePathRef.current = filePath;
 	const { currentTheme } = useThemeStore();
 
-	// Memoize editor theme based on current app theme
 	const editorTheme = useMemo(() => buildEditorTheme(currentTheme), [currentTheme]);
 
-	// Use ref so the keydown handler always calls the latest save logic
 	const saveRef = useRef<() => Promise<void>>(async () => {});
 
 	const fileName = filePath.replace(/\\/g, "/").split("/").pop() || "untitled";
 
+	// Notify parent of dirty state changes
+	const setDirty = (dirty: boolean) => {
+		setIsDirty(dirty);
+		onDirtyChange?.(dirty);
+	};
+
 	// Keep saveRef always up to date
 	saveRef.current = async () => {
 		const view = viewRef.current;
-		if (!view) {
-			console.error("[Editor] No view ref");
-			return;
-		}
+		if (!view) return;
 		const content = view.state.doc.toString();
-		console.log("[Editor] Save called, content length:", content.length, "original length:", originalContentRef.current.length, "same:", content === originalContentRef.current);
 		setSaving(true);
 		setError(null);
 		try {
@@ -102,7 +105,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 				content,
 			});
 			originalContentRef.current = content;
-			setIsDirty(false);
+			setDirty(false);
 			setSaveStatus("Saved ✓");
 			setTimeout(() => setSaveStatus(null), 2000);
 		} catch (e: any) {
@@ -111,7 +114,16 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		setSaving(false);
 	};
 
-	// Global Ctrl+S — uses ref so it always has latest save function
+	// Close handler — confirm if dirty
+	const handleClose = () => {
+		if (isDirty) {
+			setShowCloseConfirm(true);
+		} else {
+			onClose();
+		}
+	};
+
+	// Global Ctrl+S
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => {
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -124,7 +136,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		return () => window.removeEventListener("keydown", handler, true);
 	}, []);
 
-	// Listen for goto-line events from search results
+	// Listen for goto-line events
 	useEffect(() => {
 		const handler = (e: Event) => {
 			const detail = (e as CustomEvent).detail;
@@ -143,10 +155,9 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 		return () => window.removeEventListener("connexio:editor-goto-line", handler);
 	}, [filePath]);
 
-	// Load file and create editor
+	// Load file and create editor — only depends on filePath (NOT theme)
 	useEffect(() => {
 		if (!containerRef.current) return;
-		// Clear any existing editor first
 		if (viewRef.current) {
 			viewRef.current.destroy();
 			viewRef.current = null;
@@ -159,6 +170,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 			.then((content) => {
 				if (destroyed || !containerRef.current) return;
 				originalContentRef.current = content;
+				setDirty(false);
 
 				const state = EditorState.create({
 					doc: content,
@@ -169,10 +181,10 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						history(),
 						keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
 						getLanguageExtension(filePath),
-						editorTheme,
+						themeCompartment.current.of(editorTheme),
 						EditorView.updateListener.of((update) => {
 							if (update.docChanged) {
-								setIsDirty(true);
+								setDirty(true);
 							}
 						}),
 					],
@@ -190,7 +202,15 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 				viewRef.current = null;
 			}
 		};
-	}, [filePath, editorTheme]);
+	}, [filePath]); // NO editorTheme dependency — theme updates handled separately
+
+	// Update theme in-place without destroying editor (preserves content + undo)
+	useEffect(() => {
+		if (!viewRef.current) return;
+		viewRef.current.dispatch({
+			effects: themeCompartment.current.reconfigure(editorTheme),
+		});
+	}, [editorTheme]);
 
 	return (
 		<div className="flex flex-col h-full">
@@ -213,7 +233,7 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 						{saving ? "Saving..." : "Save"}
 					</button>
 					<button
-						onClick={onClose}
+						onClick={handleClose}
 						className="p-1 rounded hover:bg-connexio-bg-tertiary transition-colors"
 						title="Close editor"
 						type="button"
@@ -228,6 +248,41 @@ export default function CodeEditor({ filePath, onClose }: Props) {
 			)}
 
 			<div ref={containerRef} className="flex-1 overflow-hidden" />
+
+			{/* Unsaved changes confirmation */}
+			{showCloseConfirm && (
+				<div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40">
+					<div className="bg-connexio-bg-secondary border border-connexio-border rounded-lg p-4 shadow-xl max-w-sm">
+						<p className="text-sm text-connexio-text mb-1 font-medium">Unsaved Changes</p>
+						<p className="text-xs text-connexio-text-secondary mb-4">
+							"{fileName}" has unsaved changes. Save before closing?
+						</p>
+						<div className="flex items-center justify-end gap-2">
+							<button
+								onClick={() => { setShowCloseConfirm(false); onClose(); }}
+								className="px-3 py-1.5 text-[11px] text-red-400 hover:bg-red-500/10 rounded transition-colors"
+								type="button"
+							>
+								Discard
+							</button>
+							<button
+								onClick={() => setShowCloseConfirm(false)}
+								className="px-3 py-1.5 text-[11px] text-connexio-text-muted hover:bg-connexio-bg-tertiary rounded transition-colors"
+								type="button"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={async () => { await saveRef.current(); setShowCloseConfirm(false); onClose(); }}
+								className="px-3 py-1.5 text-[11px] font-medium bg-connexio-accent text-white rounded hover:bg-connexio-accent-hover transition-colors"
+								type="button"
+							>
+								Save & Close
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -7,6 +7,8 @@ interface TabProps {
 	isActive: boolean;
 	index: number;
 	canClose: boolean;
+	isDirty?: boolean;
+	tabType?: "terminal" | "editor" | "preview";
 	onSelect: () => void;
 	onClose: () => void;
 	onRename: (newLabel: string) => void;
@@ -25,6 +27,8 @@ export default function WorkspaceTab({
 	isActive,
 	index,
 	canClose,
+	isDirty,
+	tabType,
 	onSelect,
 	onClose,
 	onRename,
@@ -196,6 +200,11 @@ export default function WorkspaceTab({
 				>
 					{label}
 				</span>
+			)}
+
+			{/* Unsaved indicator dot */}
+			{isDirty && (
+				<span className="w-1.5 h-1.5 rounded-full bg-connexio-accent flex-shrink-0" title="Unsaved changes" />
 			)}
 
 			{/* Close button — always pinned to the right */}
