@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 	cursorBlink: false,
 	scrollback: 1000,
 	copyOnSelect: false,
+	webglRenderer: true,
 };
 
 function clampScrollback(value: number): number {
@@ -236,6 +237,22 @@ function GeneralSettings({
 				<ToggleSwitch
 					checked={settings.copyOnSelect}
 					onChange={(v) => onChange("copyOnSelect", v)}
+				/>
+			</div>
+
+			{/* WebGL Renderer */}
+			<div className="flex items-center justify-between">
+				<div>
+					<label className="block text-xs font-medium text-connexio-text-secondary">
+						WebGL Renderer
+					</label>
+					<p className="text-[10px] text-connexio-text-muted mt-0.5">
+						Hardware-accelerated rendering (faster for large output)
+					</p>
+				</div>
+				<ToggleSwitch
+					checked={settings.webglRenderer}
+					onChange={(v) => onChange("webglRenderer", v)}
 				/>
 			</div>
 		</div>

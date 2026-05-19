@@ -87,6 +87,7 @@ export interface AppSettings {
 	cursorBlink: boolean;
 	scrollback: number;
 	copyOnSelect: boolean;
+	webglRenderer: boolean;
 }
 
 export interface ShellInfo {

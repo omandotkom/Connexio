@@ -21,6 +21,7 @@ pub struct AppSettings {
     pub cursor_blink: bool,
     pub scrollback: u32,
     pub copy_on_select: bool,
+    pub webgl_renderer: bool,
 }
 
 impl Default for AppSettings {
@@ -33,6 +34,7 @@ impl Default for AppSettings {
             cursor_blink: false,
             scrollback: 1000,
             copy_on_select: false,
+            webgl_renderer: true,
         }
     }
 }

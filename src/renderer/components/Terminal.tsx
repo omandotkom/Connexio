@@ -1,6 +1,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { Search, X as XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -206,6 +207,22 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		fitAddonRef.current = fitAddon;
 		searchAddonRef.current = searchAddon;
 
+		// --- WebGL renderer (optional, enabled via settings) ---
+		let webglAddon: WebglAddon | null = null;
+		if (settings?.webglRenderer !== false) {
+			try {
+				webglAddon = new WebglAddon();
+				webglAddon.onContextLoss(() => {
+					// Fallback to DOM renderer on context loss
+					webglAddon?.dispose();
+				});
+				xterm.loadAddon(webglAddon);
+			} catch (_e) {
+				// WebGL not available, fall back to DOM renderer
+				webglAddon = null;
+			}
+		}
+
 		// --- Write batcher ---
 		// Data from PTY is buffered and flushed in batches.
 		// When the terminal container is hidden (display:none, 0×0),
@@ -330,7 +347,12 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			terminalEl.removeEventListener("paste", blockPaste, true);
 			document.removeEventListener("keydown", handleCtrlV, true);
 
-			// 6. Finally dispose xterm (after everything else is cleaned up)
+			// 6. Dispose WebGL addon
+			if (webglAddon) {
+				try { webglAddon.dispose(); } catch (_e) { /* ignore */ }
+			}
+
+			// 7. Finally dispose xterm (after everything else is cleaned up)
 			try {
 				xterm.dispose();
 			} catch (_e) {
