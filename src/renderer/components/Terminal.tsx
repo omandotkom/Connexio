@@ -156,33 +156,6 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 
 		xterm.open(containerRef.current);
 
-		// Handle Ctrl+V: if clipboard has no text (image only),
-		// send raw \x16 to PTY so TUI apps (opencode) can read clipboard image
-		xterm.attachCustomKeyEventHandler((e) => {
-			if ((e.ctrlKey || e.metaKey) && e.key === "v" && e.type === "keydown") {
-				navigator.clipboard.readText().then((text) => {
-					if (text) {
-						// Has text — let xterm handle normal paste
-						if (!disposedRef.current) {
-							window.connexio.terminal.write(terminalId, text);
-						}
-					} else {
-						// No text (image only) — send raw Ctrl+V to PTY
-						if (!disposedRef.current) {
-							window.connexio.terminal.write(terminalId, "\x16");
-						}
-					}
-				}).catch(() => {
-					// Clipboard read failed — send raw Ctrl+V as fallback
-					if (!disposedRef.current) {
-						window.connexio.terminal.write(terminalId, "\x16");
-					}
-				});
-				return false; // Prevent xterm default handling
-			}
-			return true;
-		});
-
 		xtermRef.current = xterm;
 		fitAddonRef.current = fitAddon;
 		searchAddonRef.current = searchAddon;
