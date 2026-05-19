@@ -343,6 +343,7 @@ interface ProjectStore {
 
 	// Split actions
 	splitTerminal: (projectId: string, tabId: string, paneId: string, direction: SplitDirection) => Promise<void>;
+	splitTerminalFromEditor: (projectId: string, tabId: string, direction: SplitDirection) => Promise<void>;
 	openEditorInSplit: (projectId: string, tabId: string, paneId: string, direction: SplitDirection, filePath: string) => void;
 	closeSplitPane: (projectId: string, tabId: string, paneId: string) => void;
 	setActiveSplitPane: (projectId: string, tabId: string, paneId: string) => void;
@@ -672,8 +673,47 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 	},
 
 	/**
-	 * Open a file editor as a split pane alongside the current terminal.
+	 * Split a terminal from an editor tab.
+	 * Creates a split layout with the editor as one pane and a new terminal as the other.
 	 */
+	splitTerminalFromEditor: async (projectId: string, tabId: string, direction: SplitDirection) => {
+		const { workspaceTabs, projects } = get();
+		const tabs = workspaceTabs[projectId] || [];
+		const tab = tabs.find((t) => t.id === tabId);
+		if (!tab || tab.type !== "editor" || !tab.filePath) return;
+
+		const project = projects.find((p) => p.id === projectId);
+		if (!project) return;
+
+		// Create new terminal
+		const newPaneId = uuid();
+		let newTerminalId: string;
+		try {
+			newTerminalId = await window.connexio.terminal.create(project.path, undefined, {
+				projectId, projectName: project.name, tabId: newPaneId, tabLabel: `${tab.label} (terminal)`,
+			});
+		} catch (e) {
+			console.error("[Connexio] Failed to create terminal from editor split:", e);
+			return;
+		}
+
+		const editorLeaf: SplitLeaf = { type: "leaf", id: uuid(), kind: "editor", terminalId: null, filePath: tab.filePath };
+		const terminalLeaf: SplitLeaf = { type: "leaf", id: newPaneId, kind: "terminal", terminalId: newTerminalId };
+		const rootBranch: SplitBranch = {
+			type: "branch", id: uuid(), direction,
+			children: [editorLeaf, terminalLeaf],
+		};
+		const updatedLayout: SplitLayout = { root: rootBranch, activePaneId: newPaneId };
+
+		const updatedTabs = tabs.map((t) => t.id === tabId ? { ...t, splitLayout: updatedLayout } : t);
+		set({ workspaceTabs: { ...workspaceTabs, [projectId]: updatedTabs } });
+		get().persistWorkspace();
+
+		setTimeout(() => {
+			window.dispatchEvent(new Event("resize"));
+			window.dispatchEvent(new Event("connexio:terminal-fit"));
+		}, 50);
+	},
 	openEditorInSplit: (projectId: string, tabId: string, paneId: string, direction: SplitDirection, filePath: string) => {
 		const { workspaceTabs } = get();
 		const tabs = workspaceTabs[projectId] || [];

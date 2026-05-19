@@ -292,9 +292,8 @@ export default function Workspace() {
 					<>
 						<button
 							onClick={() => {
-								if (activeTab.type === "editor" && activeTab.filePath) {
-									// Split from editor: open terminal alongside
-									useProjectStore.getState().openEditorInSplit(activeProjectId, activeTab.id, activeTab.id, "horizontal", activeTab.filePath);
+								if (activeTab.type === "editor") {
+									useProjectStore.getState().splitTerminalFromEditor(activeProjectId, activeTab.id, "horizontal");
 								} else {
 									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
 									splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
@@ -308,8 +307,8 @@ export default function Workspace() {
 						</button>
 						<button
 							onClick={() => {
-								if (activeTab.type === "editor" && activeTab.filePath) {
-									useProjectStore.getState().openEditorInSplit(activeProjectId, activeTab.id, activeTab.id, "vertical", activeTab.filePath);
+								if (activeTab.type === "editor") {
+									useProjectStore.getState().splitTerminalFromEditor(activeProjectId, activeTab.id, "vertical");
 								} else {
 									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
 									splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
