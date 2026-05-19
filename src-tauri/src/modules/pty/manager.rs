@@ -77,18 +77,13 @@ pub fn terminal_create(
 
     let mut cmd = CommandBuilder::new(&shell_path);
 
-    // For PowerShell: inject init script that sets UTF-8 encoding
-    // then sources user profile (oh-my-posh, starship, etc.)
+    // For PowerShell: set UTF-8 encoding via -Command but let profile load normally
     #[cfg(target_os = "windows")]
     if is_powershell {
-        if let Some(profile_path) = find_shell_integration_profile() {
-            cmd.arg("-NoLogo");
-            cmd.arg("-NoExit");
-            cmd.arg("-ExecutionPolicy");
-            cmd.arg("Bypass");
-            cmd.arg("-File");
-            cmd.arg(profile_path.to_string_lossy().to_string());
-        }
+        cmd.arg("-NoLogo");
+        cmd.arg("-NoExit");
+        cmd.arg("-Command");
+        cmd.arg("[Console]::InputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $global:OutputEncoding = [System.Text.UTF8Encoding]::new($false)");
     }
 
     // Set working directory
@@ -266,30 +261,4 @@ fn default_shell() -> String {
     }
 }
 
-/// Find the shell integration profile.ps1 for PowerShell
-#[cfg(target_os = "windows")]
-fn find_shell_integration_profile() -> Option<std::path::PathBuf> {
-    // 1. Check cache dir (written on first run)
-    let cache_dir = dirs::home_dir()?
-        .join(".cache")
-        .join("connexio")
-        .join("shell-integration");
-    let cached = cache_dir.join("profile.ps1");
-    
-    // Write/update the profile from embedded source
-    let profile_content = include_str!("../../scripts/profile.ps1");
-    let _ = std::fs::create_dir_all(&cache_dir);
-    
-    // Only write if content changed
-    let needs_write = std::fs::read_to_string(&cached)
-        .map(|existing| existing != profile_content)
-        .unwrap_or(true);
-    if needs_write {
-        if std::fs::write(&cached, profile_content).is_err() {
-            return None;
-        }
-    }
-    
-    Some(cached)
-}
 
