@@ -40,7 +40,6 @@ export default function Workspace() {
 	const [closeConfirmTabId, setCloseConfirmTabId] = useState<string | null>(
 		null,
 	);
-	const [showPreview, setShowPreview] = useState(false);
 	const tabBarRef = useRef<HTMLDivElement>(null);
 
 	// Resizable side panel
@@ -277,14 +276,10 @@ export default function Workspace() {
 					<CommandTimer terminalId={activeTab.terminalId} />
 				)}
 
-				{/* Web Preview toggle */}
+				{/* Web Preview — open as tab */}
 				<button
-					onClick={() => setShowPreview(!showPreview)}
-					className={`p-1 rounded transition-colors ${
-						showPreview
-							? "bg-connexio-accent/10 text-connexio-accent"
-							: "hover:bg-connexio-bg-tertiary text-connexio-text-muted"
-					}`}
+					onClick={() => useProjectStore.getState().openPreviewTab(activeProjectId)}
+					className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted"
 					title="Web Preview"
 					type="button"
 				>
@@ -467,13 +462,8 @@ export default function Workspace() {
 						}
 					}}
 				>
-					{/* Web Preview (takes over entire area) */}
-					{showPreview && (
-						<WebPreview onClose={() => setShowPreview(false)} />
-					)}
-
 					{/* Editor tab (shown when active tab is editor type) */}
-					{!showPreview && activeTab?.type === "editor" && activeTab.filePath && (
+					{activeTab?.type === "editor" && activeTab.filePath && (
 						<div className="flex-1 min-h-0">
 							<CodeEditor
 								key={activeTab.filePath}
@@ -483,8 +473,15 @@ export default function Workspace() {
 						</div>
 					)}
 
+					{/* Preview tab (shown when active tab is preview type) */}
+					{activeTab?.type === "preview" && (
+						<div className="flex-1 min-h-0">
+							<WebPreview onClose={() => closeTerminalTab(activeProjectId, activeTab.id)} />
+						</div>
+					)}
+
 					{/* Terminal (shown when active tab is terminal type) */}
-					<div className={showPreview || activeTab?.type === "editor" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
+					<div className={activeTab?.type === "editor" || activeTab?.type === "preview" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
 						<TerminalLayer />
 					</div>
 				</div>

@@ -335,6 +335,7 @@ interface ProjectStore {
 
 	openTerminalTab: (projectId: string, label?: string, shell?: string) => Promise<void>;
 	openEditorTab: (projectId: string, filePath: string, lineNumber?: number) => void;
+	openPreviewTab: (projectId: string, url?: string) => void;
 	closeTerminalTab: (projectId: string, tabId: string) => void;
 	setActiveTerminalTab: (projectId: string, tabId: string) => void;
 	renameTerminalTab: (projectId: string, tabId: string, newLabel: string) => void;
@@ -529,6 +530,30 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 				window.dispatchEvent(new CustomEvent("connexio:editor-goto-line", { detail: { filePath, lineNumber } }));
 			}, 300);
 		}
+	},
+
+	openPreviewTab: (projectId: string, url?: string) => {
+		const { workspaceTabs, activeTabIds } = get();
+		const existingTabs = workspaceTabs[projectId] || [];
+
+		// Reuse existing preview tab if one exists
+		const existing = existingTabs.find((t) => t.type === "preview");
+		if (existing) {
+			set({ activeTabIds: { ...activeTabIds, [projectId]: existing.id } });
+			return;
+		}
+
+		const newTab: TerminalTab = {
+			id: uuid(),
+			label: "Preview",
+			type: "preview",
+			filePath: url || "http://localhost:3000",
+			terminalId: null,
+		};
+		set({
+			workspaceTabs: { ...workspaceTabs, [projectId]: [...existingTabs, newTab] },
+			activeTabIds: { ...activeTabIds, [projectId]: newTab.id },
+		});
 	},
 
 	closeTerminalTab: (projectId: string, tabId: string) => {
