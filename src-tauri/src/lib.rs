@@ -135,9 +135,6 @@ pub fn run() {
             modules::explorer::explorer_new_folder,
             modules::explorer::explorer_open_path,
             modules::explorer::explorer_search_in_files,
-            // Clipboard
-            modules::clipboard::clipboard_has_image,
-            modules::clipboard::clipboard_read_text,
         ])
         .on_window_event(|window, event| {
             match event {

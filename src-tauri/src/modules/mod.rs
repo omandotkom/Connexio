@@ -12,4 +12,3 @@ pub mod ssh;
 pub mod updater;
 pub mod notification;
 pub mod explorer;
-pub mod clipboard;
