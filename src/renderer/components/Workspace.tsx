@@ -288,12 +288,17 @@ export default function Workspace() {
 				</button>
 
 				{/* Split buttons */}
-				{activeTab && (activeTab.terminalId || activeTab.splitLayout) && (
+				{activeTab && (
 					<>
 						<button
 							onClick={() => {
-								const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
-								splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
+								if (activeTab.type === "editor" && activeTab.filePath) {
+									// Split from editor: open terminal alongside
+									useProjectStore.getState().openEditorInSplit(activeProjectId, activeTab.id, activeTab.id, "horizontal", activeTab.filePath);
+								} else {
+									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
+									splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
+								}
 							}}
 							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"
 							title="Split Right (Ctrl+Shift+D)"
@@ -303,8 +308,12 @@ export default function Workspace() {
 						</button>
 						<button
 							onClick={() => {
-								const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
-								splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
+								if (activeTab.type === "editor" && activeTab.filePath) {
+									useProjectStore.getState().openEditorInSplit(activeProjectId, activeTab.id, activeTab.id, "vertical", activeTab.filePath);
+								} else {
+									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
+									splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
+								}
 							}}
 							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"
 							title="Split Down (Ctrl+Shift+E)"
