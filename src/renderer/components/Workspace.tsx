@@ -292,11 +292,13 @@ export default function Workspace() {
 					<>
 						<button
 							onClick={() => {
-								if (activeTab.type === "editor") {
+								if (activeTab.splitLayout) {
+									const paneId = activeTab.splitLayout.activePaneId;
+									splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
+								} else if (activeTab.type === "editor") {
 									useProjectStore.getState().splitTerminalFromEditor(activeProjectId, activeTab.id, "horizontal");
 								} else {
-									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
-									splitTerminal(activeProjectId, activeTab.id, paneId, "horizontal");
+									splitTerminal(activeProjectId, activeTab.id, activeTab.id, "horizontal");
 								}
 							}}
 							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"
@@ -307,11 +309,13 @@ export default function Workspace() {
 						</button>
 						<button
 							onClick={() => {
-								if (activeTab.type === "editor") {
+								if (activeTab.splitLayout) {
+									const paneId = activeTab.splitLayout.activePaneId;
+									splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
+								} else if (activeTab.type === "editor") {
 									useProjectStore.getState().splitTerminalFromEditor(activeProjectId, activeTab.id, "vertical");
 								} else {
-									const paneId = activeTab.splitLayout ? activeTab.splitLayout.activePaneId : activeTab.id;
-									splitTerminal(activeProjectId, activeTab.id, paneId, "vertical");
+									splitTerminal(activeProjectId, activeTab.id, activeTab.id, "vertical");
 								}
 							}}
 							className="p-1 rounded transition-colors hover:bg-connexio-bg-tertiary text-connexio-text-muted hover:text-connexio-text-secondary"

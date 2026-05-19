@@ -8,8 +8,8 @@ import { css } from "@codemirror/lang-css";
 import { markdown } from "@codemirror/lang-markdown";
 import { python } from "@codemirror/lang-python";
 import { rust } from "@codemirror/lang-rust";
-import { Save, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Save, X, Clipboard, Copy, Scissors, TextSelect } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useThemeStore } from "../../stores/themeStore";
 
@@ -75,6 +75,7 @@ export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) 
 	const [error, setError] = useState<string | null>(null);
 	const [saveStatus, setSaveStatus] = useState<string | null>(null);
 	const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+	const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
 	const originalContentRef = useRef("");
 	const filePathRef = useRef(filePath);
 	filePathRef.current = filePath;
@@ -122,6 +123,39 @@ export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) 
 			onClose();
 		}
 	};
+
+	// Context menu
+	const handleContextMenu = useCallback((e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setCtxMenu({ x: e.clientX, y: e.clientY });
+	}, []);
+
+	const execCommand = useCallback((cmd: "cut" | "copy" | "paste" | "selectAll") => {
+		setCtxMenu(null);
+		const view = viewRef.current;
+		if (!view) return;
+		view.focus();
+		switch (cmd) {
+			case "cut":
+				document.execCommand("cut");
+				break;
+			case "copy":
+				document.execCommand("copy");
+				break;
+			case "paste":
+				navigator.clipboard.readText().then((text) => {
+					if (text && view) {
+						const { from, to } = view.state.selection.main;
+						view.dispatch({ changes: { from, to, insert: text } });
+					}
+				}).catch(() => {});
+				break;
+			case "selectAll":
+				view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+				break;
+		}
+	}, []);
 
 	// Global Ctrl+S
 	useEffect(() => {
@@ -247,7 +281,20 @@ export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) 
 				<div className="px-3 py-1.5 text-[11px] text-red-400 bg-red-500/10 border-b border-red-500/20">{error}</div>
 			)}
 
-			<div ref={containerRef} className="flex-1 overflow-hidden" />
+			<div ref={containerRef} className="flex-1 overflow-hidden" data-custom-context-menu="" onContextMenu={handleContextMenu} />
+
+			{/* Editor context menu */}
+			{ctxMenu && (
+				<EditorContextMenu
+					x={ctxMenu.x}
+					y={ctxMenu.y}
+					onClose={() => setCtxMenu(null)}
+					onCut={() => execCommand("cut")}
+					onCopy={() => execCommand("copy")}
+					onPaste={() => execCommand("paste")}
+					onSelectAll={() => execCommand("selectAll")}
+				/>
+			)}
 
 			{/* Unsaved changes confirmation */}
 			{showCloseConfirm && (
@@ -283,6 +330,61 @@ export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) 
 					</div>
 				</div>
 			)}
+		</div>
+	);
+}
+
+// ─── Editor Context Menu ──────────────────────────────────────────────────────
+
+function EditorContextMenu({ x, y, onClose, onCut, onCopy, onPaste, onSelectAll }: {
+	x: number;
+	y: number;
+	onClose: () => void;
+	onCut: () => void;
+	onCopy: () => void;
+	onPaste: () => void;
+	onSelectAll: () => void;
+}) {
+	const menuRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const handleClick = (e: MouseEvent) => {
+			if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+		};
+		const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+		document.addEventListener("mousedown", handleClick);
+		document.addEventListener("keydown", handleKey);
+		return () => {
+			document.removeEventListener("mousedown", handleClick);
+			document.removeEventListener("keydown", handleKey);
+		};
+	}, [onClose]);
+
+	const items = [
+		{ icon: Scissors, label: "Cut", shortcut: "Ctrl+X", action: onCut },
+		{ icon: Copy, label: "Copy", shortcut: "Ctrl+C", action: onCopy },
+		{ icon: Clipboard, label: "Paste", shortcut: "Ctrl+V", action: onPaste },
+		{ icon: TextSelect, label: "Select All", shortcut: "Ctrl+A", action: onSelectAll },
+	];
+
+	return (
+		<div
+			ref={menuRef}
+			className="fixed z-[300] min-w-[160px] py-1 bg-connexio-bg-secondary border border-connexio-border rounded-lg shadow-xl"
+			style={{ top: y, left: x }}
+		>
+			{items.map((item) => (
+				<button
+					key={item.label}
+					onClick={item.action}
+					className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[11px] text-connexio-text hover:bg-connexio-bg-tertiary transition-colors"
+					type="button"
+				>
+					<item.icon size={12} className="text-connexio-text-muted" />
+					<span className="flex-1 text-left">{item.label}</span>
+					<span className="text-[10px] text-connexio-text-muted">{item.shortcut}</span>
+				</button>
+			))}
 		</div>
 	);
 }
