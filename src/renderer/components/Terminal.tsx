@@ -4,6 +4,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { Search, X as XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { TerminalThemeColors } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
@@ -155,6 +156,34 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		xterm.loadAddon(new WebLinksAddon());
 
 		xterm.open(containerRef.current);
+
+		// Intercept Ctrl+V: read clipboard via Rust backend (bypasses WebView2 bug)
+		// WebView2 doesn't expose image data in paste events, so we use OS API
+		xterm.attachCustomKeyEventHandler((e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "v" && e.type === "keydown") {
+				// Handle paste ourselves via Rust backend
+				(async () => {
+					if (disposedRef.current) return;
+					try {
+						const text = await invoke<string | null>("clipboard_read_text");
+						if (text) {
+							window.connexio.terminal.write(terminalId, text);
+						} else {
+							// No text — check if image exists, send raw Ctrl+V to PTY
+							const hasImage = await invoke<boolean>("clipboard_has_image");
+							if (hasImage) {
+								window.connexio.terminal.write(terminalId, "\x16");
+							}
+						}
+					} catch {
+						// Fallback: send raw Ctrl+V
+						window.connexio.terminal.write(terminalId, "\x16");
+					}
+				})();
+				return false; // Block xterm default + browser paste
+			}
+			return true;
+		});
 
 		xtermRef.current = xterm;
 		fitAddonRef.current = fitAddon;
