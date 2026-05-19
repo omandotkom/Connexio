@@ -63,7 +63,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 	const visibleRef = useRef(isVisible ?? false);
 	visibleRef.current = isVisible ?? false;
 	const { currentTheme } = useThemeStore();
-	const { settings } = useSettingsStore();
+	// Read settings once at mount — avoid re-renders when settings modal opens
+	const settingsRef = useRef(useSettingsStore.getState().settings);
+	const settings = settingsRef.current;
 
 	// Search bar state
 	const [showSearch, setShowSearch] = useState(false);
@@ -207,9 +209,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		fitAddonRef.current = fitAddon;
 		searchAddonRef.current = searchAddon;
 
-		// --- WebGL renderer (optional, enabled via settings) ---
+		// --- WebGL renderer (optional, must be explicitly enabled in settings) ---
 		let webglAddon: WebglAddon | null = null;
-		if (settings?.webglRenderer !== false) {
+		if (settings?.webglRenderer === true) {
 			try {
 				webglAddon = new WebglAddon();
 				webglAddon.onContextLoss(() => {
@@ -425,22 +427,25 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		};
 	}, [isVisible, terminalId]);
 
-	// Effect: update settings
+	// Effect: subscribe to settings changes without triggering re-renders
 	useEffect(() => {
-		if (disposedRef.current || !xtermRef.current || !settings) return;
-		try {
-			xtermRef.current.options.fontSize = settings.fontSize;
-			xtermRef.current.options.fontFamily = settings.fontFamily;
-			xtermRef.current.options.cursorBlink = settings.cursorBlink;
-			xtermRef.current.options.cursorStyle = settings.cursorStyle;
-			xtermRef.current.options.scrollback = clampScrollback(
-				settings.scrollback,
-			);
-			safeFit();
-		} catch (_e) {
-			// ignore
-		}
-	}, [settings]);
+		const unsubSettings = useSettingsStore.subscribe((state) => {
+			if (disposedRef.current || !xtermRef.current || !state.settings) return;
+			try {
+				xtermRef.current.options.fontSize = state.settings.fontSize;
+				xtermRef.current.options.fontFamily = state.settings.fontFamily;
+				xtermRef.current.options.cursorBlink = state.settings.cursorBlink;
+				xtermRef.current.options.cursorStyle = state.settings.cursorStyle;
+				xtermRef.current.options.scrollback = clampScrollback(
+					state.settings.scrollback,
+				);
+				safeFit();
+			} catch (_e) {
+				// ignore
+			}
+		});
+		return unsubSettings;
+	}, []);
 
 	// Terminal search handlers
 	const handleSearchOpen = useCallback(() => {
