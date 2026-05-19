@@ -473,8 +473,8 @@ export default function Workspace() {
 						}
 					}}
 				>
-					{/* Editor tabs — all rendered, only active visible (preserves state) */}
-					{tabs.filter((t) => t.type === "editor" && t.filePath).map((tab) => (
+					{/* Editor tabs — only render those WITHOUT splitLayout (split ones go to TerminalLayer) */}
+					{tabs.filter((t) => t.type === "editor" && t.filePath && !t.splitLayout).map((tab) => (
 						<div
 							key={`editor-${tab.id}`}
 							className={activeTabId === tab.id ? "flex-1 min-h-0" : "hidden"}
@@ -501,8 +501,8 @@ export default function Workspace() {
 						</div>
 					)}
 
-					{/* Terminal (hidden when editor or preview is active) */}
-					<div className={activeTab?.type === "editor" || activeTab?.type === "preview" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
+					{/* Terminal/Split area (hidden only when pure editor or preview is active) */}
+					<div className={(activeTab?.type === "editor" && !activeTab?.splitLayout) || activeTab?.type === "preview" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
 						<TerminalLayer />
 					</div>
 				</div>
