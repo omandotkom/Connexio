@@ -12,19 +12,7 @@ try {
 } catch {}
 
 # Source user's normal profile (oh-my-posh, starship, aliases, etc.)
-$userProfile = [System.IO.Path]::Combine(
-    [Environment]::GetFolderPath('MyDocuments'),
-    'PowerShell', 'Microsoft.PowerShell_profile.ps1'
-)
-if (Test-Path $userProfile) {
-    . $userProfile
-} else {
-    # Fallback: Windows PowerShell 5.1 profile location
-    $userProfile5 = [System.IO.Path]::Combine(
-        [Environment]::GetFolderPath('MyDocuments'),
-        'WindowsPowerShell', 'Microsoft.PowerShell_profile.ps1'
-    )
-    if (Test-Path $userProfile5) {
-        . $userProfile5
-    }
+# Use $PROFILE which PowerShell always resolves correctly regardless of OneDrive
+if ($PROFILE -and (Test-Path $PROFILE)) {
+    . $PROFILE
 }
