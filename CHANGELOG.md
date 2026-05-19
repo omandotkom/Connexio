@@ -1,8 +1,9 @@
 # Changelog
 
-## [0.4.0-dev.1] — 2025-05-19 (Pre-release)
+## [0.4.0-dev.1] — 2026-05-19 (Pre-release)
 
 > ⚠️ **Dev build** — Tauri v2 migration. Not recommended for general use yet.
+> Version in binaries shows `0.4.0` (Windows/NSIS requires numeric-only versions).
 
 ### 🚀 Major: Electron → Tauri v2 Migration
 
