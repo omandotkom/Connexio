@@ -253,26 +253,6 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 		const terminalEl = containerRef.current;
 		terminalEl.addEventListener("contextmenu", handleContextMenu);
 
-		// --- Image paste support for TUI agents (opencode, etc) ---
-		// xterm.js handles text paste via browser paste event, but ignores
-		// image-only clipboard. Send raw \x16 (Ctrl+V) to PTY so TUI apps
-		// can detect paste and read clipboard image via OS APIs.
-		const handlePasteEvent = (e: ClipboardEvent) => {
-			if (disposedRef.current) return;
-			const clipData = e.clipboardData;
-			if (!clipData) return;
-			// If there's text, let xterm.js handle it normally
-			const text = clipData.getData("text/plain");
-			if (text) return;
-			// No text but has files/images — send raw Ctrl+V to PTY
-			if (clipData.files.length > 0 || clipData.types.includes("image/png")) {
-				e.preventDefault();
-				e.stopPropagation();
-				window.connexio.terminal.write(terminalId, "\x16");
-			}
-		};
-		terminalEl.addEventListener("paste", handlePasteEvent);
-
 		const initTimer1 = setTimeout(safeFit, 50);
 		const initTimer2 = setTimeout(safeFit, 200);
 		const initTimer3 = setTimeout(safeFit, 500);
@@ -298,10 +278,9 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			selectionDisposable.dispose();
 			dataDisposable.dispose();
 
-			// 5. Disconnect resize observer & context menu & paste
+			// 5. Disconnect resize observer & context menu
 			resizeObserver.disconnect();
 			terminalEl.removeEventListener("contextmenu", handleContextMenu);
-			terminalEl.removeEventListener("paste", handlePasteEvent);
 
 			// 6. Finally dispose xterm (after everything else is cleaned up)
 			try {
