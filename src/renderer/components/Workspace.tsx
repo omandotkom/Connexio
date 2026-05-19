@@ -465,24 +465,26 @@ export default function Workspace() {
 						}
 					}}
 				>
-					{/* Editor tab (shown when active tab is editor type) */}
-					{activeTab?.type === "editor" && activeTab.filePath && (
-						<div className="flex-1 min-h-0">
+					{/* Editor tabs — all rendered, only active visible (preserves state) */}
+					{tabs.filter((t) => t.type === "editor" && t.filePath).map((tab) => (
+						<div
+							key={`editor-${tab.id}`}
+							className={activeTabId === tab.id ? "flex-1 min-h-0" : "hidden"}
+						>
 							<CodeEditor
-								key={activeTab.filePath}
-								filePath={activeTab.filePath}
-								onClose={() => closeTerminalTab(activeProjectId, activeTab.id)}
+								filePath={tab.filePath!}
+								onClose={() => closeTerminalTab(activeProjectId, tab.id)}
 								onDirtyChange={(dirty) => {
 									setDirtyTabs((prev) => {
 										const next = new Set(prev);
-										if (dirty) next.add(activeTab.id);
-										else next.delete(activeTab.id);
+										if (dirty) next.add(tab.id);
+										else next.delete(tab.id);
 										return next;
 									});
 								}}
 							/>
 						</div>
-					)}
+					))}
 
 					{/* Preview tab (shown when active tab is preview type) */}
 					{activeTab?.type === "preview" && (
@@ -491,7 +493,7 @@ export default function Workspace() {
 						</div>
 					)}
 
-					{/* Terminal (shown when active tab is terminal type) */}
+					{/* Terminal (hidden when editor or preview is active) */}
 					<div className={activeTab?.type === "editor" || activeTab?.type === "preview" ? "hidden" : "flex-1 min-h-0 relative"} data-terminal-layer-container="">
 						<TerminalLayer />
 					</div>
