@@ -4,6 +4,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { Search, X as XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { TerminalThemeColors } from "../../shared/types";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useThemeStore } from "../stores/themeStore";
@@ -156,6 +157,46 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 
 		xterm.open(containerRef.current);
 
+		// --- Paste handling: bypass xterm.js entirely, use Rust backend ---
+		// WebView2 has a bug where clipboard image data is not available in
+		// paste events. We block ALL xterm paste handling and do it ourselves.
+
+		// 1. Block Ctrl+V keydown so xterm doesn't trigger browser paste
+		xterm.attachCustomKeyEventHandler((e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "v" && e.type === "keydown") {
+				return false;
+			}
+			return true;
+		});
+
+		// 2. Block DOM paste event so xterm's internal handler doesn't fire
+		const blockPaste = (e: Event) => {
+			e.preventDefault();
+			e.stopPropagation();
+		};
+		containerRef.current.addEventListener("paste", blockPaste, true);
+
+		// 3. Handle Ctrl+V ourselves via Rust clipboard API
+		const handleCtrlV = async (e: KeyboardEvent) => {
+			if (!(e.ctrlKey || e.metaKey) || e.key !== "v" || e.type !== "keydown") return;
+			if (disposedRef.current) return;
+			// Only handle if this terminal's container has focus
+			if (!containerRef.current?.contains(document.activeElement)) return;
+			e.preventDefault();
+			try {
+				const text = await invoke<string | null>("clipboard_read_text");
+				if (text) {
+					window.connexio.terminal.write(terminalId, text);
+				} else {
+					// No text — send raw \x16 so TUI apps can read clipboard image
+					window.connexio.terminal.write(terminalId, "\x16");
+				}
+			} catch {
+				window.connexio.terminal.write(terminalId, "\x16");
+			}
+		};
+		document.addEventListener("keydown", handleCtrlV, true);
+
 		xtermRef.current = xterm;
 		fitAddonRef.current = fitAddon;
 		searchAddonRef.current = searchAddon;
@@ -278,9 +319,11 @@ export default function Terminal({ terminalId, isVisible }: Props) {
 			selectionDisposable.dispose();
 			dataDisposable.dispose();
 
-			// 5. Disconnect resize observer & context menu
+			// 5. Disconnect resize observer & context menu & paste handlers
 			resizeObserver.disconnect();
 			terminalEl.removeEventListener("contextmenu", handleContextMenu);
+			terminalEl.removeEventListener("paste", blockPaste, true);
+			document.removeEventListener("keydown", handleCtrlV, true);
 
 			// 6. Finally dispose xterm (after everything else is cleaned up)
 			try {
