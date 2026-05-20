@@ -5,130 +5,51 @@ on:
     tags:
       - "v*"
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  determine-release:
+  prepare:
+    name: Prepare Release
     runs-on: ubuntu-latest
     outputs:
-      is-prerelease: ${{ steps.check.outputs.is-prerelease }}
+      is_prerelease: ${{ steps.check.outputs.is_prerelease }}
       version: ${{ steps.check.outputs.version }}
       tag: ${{ steps.check.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.notes }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Check release type
         id: check
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG#v}
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-          # Pre-release if tag contains -dev, -alpha, -beta, -rc
           if [[ "$TAG" =~ -(dev|alpha|beta|rc) ]]; then
-            echo "is-prerelease=true" >> $GITHUB_OUTPUT
-            echo "🔶 Pre-release detected: $TAG"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is-prerelease=false" >> $GITHUB_OUTPUT
-            echo "🟢 Stable release detected: $TAG"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
-
-  build:
-    needs: determine-release
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact-name: connexio-windows
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact-name: connexio-macos-arm64
-          - os: macos-13
-            target: x86_64-apple-darwin
-            artifact-name: connexio-macos-x64
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            artifact-name: connexio-linux
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          key: ${{ matrix.target }}
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build with Tauri
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ needs.determine-release.outputs.tag }}
-          releaseName: "Connexio ${{ needs.determine-release.outputs.tag }}"
-          releaseBody: ""
-          releaseDraft: false
-          prerelease: ${{ needs.determine-release.outputs.is-prerelease }}
-          args: --target ${{ matrix.target }}
-
-  publish-release:
-    needs: [determine-release, build]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Generate changelog
         id: changelog
         run: |
-          TAG=${{ needs.determine-release.outputs.tag }}
-          VERSION=${{ needs.determine-release.outputs.version }}
-          IS_PRE=${{ needs.determine-release.outputs.is-prerelease }}
-
-          # Get previous tag (skip current)
+          TAG="${GITHUB_REF#refs/tags/}"
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^$TAG$" | head -1)
 
           if [ -z "$PREV_TAG" ]; then
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
-
-          echo "Generating changelog from $PREV_TAG to $TAG"
 
           FEATURES=""
           FIXES=""
@@ -136,24 +57,17 @@ jobs:
 
           while IFS= read -r line; do
             if [[ "$line" == feat:* ]] || [[ "$line" == feat\(*\):* ]]; then
-              FEATURES="$FEATURES\n- ${line#feat: }"
+              FEATURES="$FEATURES\n- ${line}"
             elif [[ "$line" == fix:* ]] || [[ "$line" == fix\(*\):* ]]; then
-              FIXES="$FIXES\n- ${line#fix: }"
+              FIXES="$FIXES\n- ${line}"
             elif [[ "$line" == ci:* ]] || [[ "$line" == chore:* ]] || [[ "$line" == release:* ]]; then
               :
-            else
+            elif [ -n "$line" ]; then
               OTHER="$OTHER\n- $line"
             fi
           done <<< "$(git log $PREV_TAG..$TAG --pretty=format:'%s' --no-merges)"
 
           NOTES=""
-
-          # Add pre-release badge if applicable
-          if [ "$IS_PRE" = "true" ]; then
-            NOTES="⚠️ **This is a pre-release build for testing purposes.**\n"
-            NOTES="$NOTES> Not recommended for general use. Please report issues you find.\n\n"
-          fi
-
           if [ -n "$FEATURES" ]; then
             NOTES="$NOTES## ✨ New Features\n$FEATURES\n\n"
           fi
@@ -164,35 +78,148 @@ jobs:
             NOTES="$NOTES## 📦 Other Changes\n$OTHER\n\n"
           fi
 
-          NOTES="$NOTES---\n\n"
-          NOTES="$NOTES**Full Changelog:** [\`$PREV_TAG...$TAG\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$TAG)\n\n"
-          NOTES="$NOTES### 📥 Downloads\n"
-          NOTES="$NOTES| Platform | File |\n"
-          NOTES="$NOTES|----------|------|\n"
-          NOTES="$NOTES| Windows | \`Connexio_${VERSION}_x64-setup.exe\` / \`.msi\` |\n"
-          NOTES="$NOTES| macOS (Apple Silicon) | \`Connexio_${VERSION}_aarch64.dmg\` |\n"
-          NOTES="$NOTES| macOS (Intel) | \`Connexio_${VERSION}_x64.dmg\` |\n"
-          NOTES="$NOTES| Linux | \`Connexio_${VERSION}_amd64.AppImage\` / \`.deb\` |"
+          NOTES="$NOTES---\n**Full Changelog:** [\`$PREV_TAG...$TAG\`](https://github.com/${{ github.repository }}/compare/$PREV_TAG...$TAG)"
 
+          # Write to file to avoid escaping issues
           echo -e "$NOTES" > release_notes.md
-          cat release_notes.md
 
-      - name: Update GitHub Release
+          # Also set as output (escaped for GitHub Actions)
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "notes<<$EOF" >> "$GITHUB_OUTPUT"
+          cat release_notes.md >> "$GITHUB_OUTPUT"
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc
+
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            rust_target: x86_64-unknown-linux-gnu
+            args: --target x86_64-unknown-linux-gnu
+
+          - platform: macos-aarch64
+            runner: macos-latest
+            rust_target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: matrix.runner == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build with Tauri
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG=${{ needs.determine-release.outputs.tag }}
-          IS_PRE=${{ needs.determine-release.outputs.is-prerelease }}
+        with:
+          tagName: ${{ needs.prepare.outputs.tag }}
+          releaseName: "Connexio ${{ needs.prepare.outputs.tag }}"
+          releaseBody: ""
+          releaseDraft: true
+          prerelease: ${{ needs.prepare.outputs.is_prerelease }}
+          args: ${{ matrix.args }}
 
-          # Set --latest only for stable releases
-          LATEST_FLAG=""
-          if [ "$IS_PRE" = "false" ]; then
-            LATEST_FLAG="--latest"
-          fi
+  publish:
+    name: Publish Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_BODY: ${{ needs.prepare.outputs.changelog }}
+          IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tagName = process.env.TAG
+            const version = process.env.VERSION
+            const prerelease = process.env.IS_PRERELEASE === 'true'
+            const releaseName = `Connexio ${tagName}`
 
-          gh release edit "$TAG" \
-            --repo ${{ github.repository }} \
-            --title "Connexio $TAG" \
-            --notes-file release_notes.md \
-            $LATEST_FLAG \
-            2>/dev/null || echo "Release edit skipped"
+            let body = process.env.RELEASE_BODY || ''
+
+            if (prerelease) {
+              body = `⚠️ **This is a pre-release build for testing purposes.**\n> Not recommended for general use. Please report issues you find.\n\n${body}`
+            }
+
+            body += `\n\n### 📥 Downloads\n`
+            body += `| Platform | File |\n|----------|------|\n`
+            body += `| Windows (installer) | \`Connexio_${version}_x64-setup.exe\` |\n`
+            body += `| Windows (MSI) | \`Connexio_${version}_x64_en-US.msi\` |\n`
+            body += `| macOS (Apple Silicon) | \`Connexio_${version}_aarch64.dmg\` |\n`
+            body += `| Linux (AppImage) | \`Connexio_${version}_amd64.AppImage\` |\n`
+            body += `| Linux (Debian) | \`Connexio_${version}_amd64.deb\` |\n`
+            body += `| Linux (RPM) | \`Connexio-${version}-1.x86_64.rpm\` |\n`
+
+            // Find the draft release created by tauri-action
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 10,
+            })
+
+            const draft = releases.data.find(r => r.tag_name === tagName)
+            if (!draft) {
+              core.setFailed(`Release for tag ${tagName} not found`)
+              return
+            }
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: draft.id,
+              tag_name: tagName,
+              name: releaseName,
+              body: body,
+              draft: false,
+              prerelease: prerelease,
+              make_latest: prerelease ? 'false' : 'true',
+            })
+
+            core.info(`Published release: ${releaseName}`)
