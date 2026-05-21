@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 // Discord Application ID — create one at https://discord.com/developers/applications
 // Using a placeholder; replace with actual Connexio app ID
-const DISCORD_APP_ID: &str = "1375020633530880071";
+const DISCORD_APP_ID: &str = "1506868392668168232";
 
 pub struct DiscordPresenceState {
     client: Mutex<Option<DiscordIpcClient>>,
@@ -94,14 +94,9 @@ pub fn discord_presence_update(
 
     let timestamps = activity::Timestamps::new().start(start_time);
 
-    let assets = activity::Assets::new()
-        .large_image("connexio_logo")
-        .large_text("Connexio — Terminal Manager");
-
     let mut act = activity::Activity::new()
         .details(&details)
-        .timestamps(timestamps)
-        .assets(assets);
+        .timestamps(timestamps);
 
     // Use a local binding so the reference lives long enough
     let status_str;
