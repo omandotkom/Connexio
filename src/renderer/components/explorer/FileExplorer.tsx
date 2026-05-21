@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ExplorerContextMenu from "./ExplorerContextMenu";
+import { useGitFileStatus, type GitFileIndicator, type GitFileStatusMap } from "../../hooks/useGitFileStatus";
 
 interface FileEntry {
 	name: string;
@@ -102,7 +103,76 @@ function InlineInput({ initialValue, placeholder, onConfirm, onCancel }: {
 
 // ─── File Tree Node ──────────────────────────────────────────────────────────
 
-function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, onRenameConfirm, newItem, onNewItemConfirm, onNewItemCancel }: {
+// ─── Git Status Helpers ──────────────────────────────────────────────────────
+
+const GIT_STATUS_COLORS: Record<GitFileIndicator, string> = {
+	M: "text-yellow-400",   // Modified
+	A: "text-green-400",    // Added
+	D: "text-red-400",      // Deleted
+	R: "text-purple-400",   // Renamed
+	U: "text-orange-400",   // Unmerged
+	"?": "text-emerald-500", // Untracked
+	C: "text-red-500",      // Conflict
+};
+
+const GIT_STATUS_LABELS: Record<GitFileIndicator, string> = {
+	M: "M",
+	A: "A",
+	D: "D",
+	R: "R",
+	U: "U",
+	"?": "U",
+	C: "!",
+};
+
+const GIT_STATUS_TOOLTIPS: Record<GitFileIndicator, string> = {
+	M: "Modified",
+	A: "Added (Staged)",
+	D: "Deleted",
+	R: "Renamed",
+	U: "Unmerged",
+	"?": "Untracked",
+	C: "Conflict",
+};
+
+function GitBadge({ status }: { status: GitFileIndicator }) {
+	return (
+		<span
+			className={`ml-auto flex-shrink-0 text-[10px] font-bold leading-none ${GIT_STATUS_COLORS[status]}`}
+			title={GIT_STATUS_TOOLTIPS[status]}
+		>
+			{GIT_STATUS_LABELS[status]}
+		</span>
+	);
+}
+
+function getRelativePath(entry: FileEntry, projectPath: string): string {
+	const normalized = entry.path.replace(/\\/g, "/");
+	const base = projectPath.replace(/\\/g, "/").replace(/\/$/, "");
+	return normalized.startsWith(base) ? normalized.slice(base.length + 1) : normalized;
+}
+
+function getGitTextColor(entry: FileEntry, gitStatusMap: GitFileStatusMap, projectPath: string): string {
+	const rel = getRelativePath(entry, projectPath);
+	if (entry.isDir) {
+		const dirStatus = gitStatusMap.getDirStatus(rel);
+		if (dirStatus) return GIT_STATUS_COLORS[dirStatus];
+		return "text-connexio-text";
+	}
+	const status = gitStatusMap.get(rel);
+	if (status) return GIT_STATUS_COLORS[status];
+	return "text-connexio-text";
+}
+
+function getGitBadge(entry: FileEntry, gitStatusMap: GitFileStatusMap, projectPath: string): React.ReactNode {
+	if (entry.isDir) return null;
+	const rel = getRelativePath(entry, projectPath);
+	const status = gitStatusMap.get(rel);
+	if (!status) return null;
+	return <GitBadge status={status} />;
+}
+
+function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, onRenameConfirm, newItem, onNewItemConfirm, onNewItemCancel, gitStatusMap, projectPath }: {
 	entry: FileEntry;
 	depth: number;
 	onOpenFile?: (filePath: string) => void;
@@ -112,6 +182,8 @@ function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, o
 	newItem: { parent: string; type: "file" | "folder" } | null;
 	onNewItemConfirm: (parent: string, name: string, type: "file" | "folder") => void;
 	onNewItemCancel: () => void;
+	gitStatusMap: GitFileStatusMap;
+	projectPath: string;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [children, setChildren] = useState<FileEntry[] | null>(entry.children);
@@ -181,7 +253,10 @@ function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, o
 						onCancel={() => onRenameConfirm(entry.path, entry.name)}
 					/>
 				) : (
-					<span className="text-[12px] text-connexio-text truncate">{entry.name}</span>
+					<>
+						<span className={`text-[12px] truncate ${getGitTextColor(entry, gitStatusMap, projectPath)}`}>{entry.name}</span>
+						{getGitBadge(entry, gitStatusMap, projectPath)}
+					</>
 				)}
 			</div>
 
@@ -212,6 +287,8 @@ function FileTreeNode({ entry, depth, onOpenFile, onContextMenu, renamingPath, o
 							newItem={newItem}
 							onNewItemConfirm={onNewItemConfirm}
 							onNewItemCancel={onNewItemCancel}
+							gitStatusMap={gitStatusMap}
+							projectPath={projectPath}
 						/>
 					))}
 					{loading && (
@@ -251,6 +328,7 @@ function highlightMatch(text: string, query: string, caseSensitive: boolean) {
 export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile, onOpenFileInSplit }: Props) {
 	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [loading, setLoading] = useState(true);
+	const gitStatusMap = useGitFileStatus(projectPath);
 	const [showHidden, setShowHidden] = useState(false);
 	const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: FileEntry } | null>(null);
 	const [renamingPath, setRenamingPath] = useState<string | null>(null);
@@ -517,6 +595,8 @@ export default function FileExplorer({ projectPath, onOpenInTerminal, onOpenFile
 							newItem={newItem}
 							onNewItemConfirm={handleNewItem}
 							onNewItemCancel={() => setNewItem(null)}
+							gitStatusMap={gitStatusMap}
+							projectPath={projectPath}
 						/>
 					))
 				)}

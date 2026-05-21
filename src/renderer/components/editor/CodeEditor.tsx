@@ -170,6 +170,21 @@ export default function CodeEditor({ filePath, onClose, onDirtyChange }: Props) 
 		return () => window.removeEventListener("keydown", handler, true);
 	}, []);
 
+	// Listen for AI insert-text events
+	useEffect(() => {
+		const handler = (e: Event) => {
+			const detail = (e as CustomEvent).detail;
+			if (detail?.filePath && detail.filePath !== filePath) return;
+			if (!detail?.text || !viewRef.current) return;
+			const view = viewRef.current;
+			const { from, to } = view.state.selection.main;
+			view.dispatch({ changes: { from, to, insert: detail.text } });
+			view.focus();
+		};
+		window.addEventListener("connexio:editor-insert-text", handler);
+		return () => window.removeEventListener("connexio:editor-insert-text", handler);
+	}, [filePath]);
+
 	// Listen for goto-line events
 	useEffect(() => {
 		const handler = (e: Event) => {
