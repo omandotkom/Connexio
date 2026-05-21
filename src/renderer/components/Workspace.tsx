@@ -2,7 +2,6 @@ import { Bot, Columns2, FolderTree, GitBranch, Globe, ListTodo, PanelRightClose,
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { AIChatPanel } from "./ai";
-import CommandTimer from "./CommandTimer";
 import ConfirmDialog from "./ConfirmDialog";
 import { CodeEditor } from "./editor";
 import { FileExplorer } from "./explorer";
@@ -271,11 +270,6 @@ export default function Workspace() {
 				<span className="text-[10px] text-connexio-text-muted truncate opacity-60 flex-shrink min-w-0">
 					{project.path}
 				</span>
-
-				{/* Command Timer for active terminal */}
-				{activeTab?.terminalId && (
-					<CommandTimer terminalId={activeTab.terminalId} />
-				)}
 
 				{/* Web Preview — open as tab */}
 				<button
