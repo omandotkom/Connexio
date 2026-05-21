@@ -1,8 +1,7 @@
 {
   "name": "connexio",
-  "version": "0.4.0",
+  "version": "0.4.1-dev.1",
   "description": "Connexio — Project-based Terminal Manager. Organize your terminals by project.",
-  "main": "dist/main/main/index.js",
   "author": "Connexio",
   "license": "MIT",
   "scripts": {
@@ -12,10 +11,7 @@
     "build:renderer": "vite build",
     "build:tauri": "tauri build",
     "tauri": "tauri",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev:electron": "concurrently -k \"npm run dev:renderer\" \"npm run dev:main\"",
-    "dev:main": "wait-on http://localhost:5173 && tsc -p tsconfig.main.json && electron .",
-    "build:electron:win": "tsc -p tsconfig.main.json && vite build && electron-builder --win"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -34,6 +30,7 @@
     "@tauri-apps/plugin-os": "^2.3.2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-store": "^2.4.3",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.15.0",
     "@xterm/addon-web-links": "^0.11.0",
@@ -55,54 +52,9 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "concurrently": "^9.1.0",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3",
-    "wait-on": "^8.0.1"
-  },
-  "build": {
-    "appId": "com.connexio.app",
-    "productName": "Connexio",
-    "npmRebuild": false,
-    "publish": {
-      "provider": "github",
-      "owner": "yandanp",
-      "repo": "Connexio"
-    },
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "node_modules/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets/",
-        "filter": [
-          "icon.*",
-          "hooks/**/*",
-          "sounds/**/*"
-        ]
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.png",
-      "category": "public.app-category.developer-tools"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
-    }
+    "vite": "^6.0.3"
   }
 }

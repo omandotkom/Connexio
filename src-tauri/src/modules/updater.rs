@@ -8,9 +8,10 @@ pub struct UpdateInfo {
     pub available: bool,
 }
 
+/// These commands are kept as stubs for backward compatibility with the frontend.
+/// The actual update logic is handled by @tauri-apps/plugin-updater on the frontend.
 #[tauri::command]
 pub fn updater_check(_app: AppHandle) -> UpdateInfo {
-    // Stub — real updater will use tauri-plugin-updater
     UpdateInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         available: false,
