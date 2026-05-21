@@ -5,18 +5,21 @@ interface SettingsStore {
 	settings: AppSettings | null;
 	shells: ShellInfo[];
 	isSettingsOpen: boolean;
+	discordPresence: boolean;
 
 	loadSettings: () => Promise<void>;
 	loadShells: () => Promise<void>;
 	updateSettings: (settings: AppSettings) => Promise<void>;
 	openSettings: () => void;
 	closeSettings: () => void;
+	setDiscordPresence: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
 	settings: null,
 	shells: [],
 	isSettingsOpen: false,
+	discordPresence: localStorage.getItem("connexio:discord-presence") === "true",
 
 	loadSettings: async () => {
 		const settings = await window.connexio.settings.get();
@@ -35,4 +38,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
 	openSettings: () => set({ isSettingsOpen: true }),
 	closeSettings: () => set({ isSettingsOpen: false }),
+
+	setDiscordPresence: (enabled: boolean) => {
+		localStorage.setItem("connexio:discord-presence", String(enabled));
+		set({ discordPresence: enabled });
+	},
 }));

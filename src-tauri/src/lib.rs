@@ -2,6 +2,7 @@ mod modules;
 
 use modules::notification::NotificationState;
 use modules::pty::PtyManager;
+use modules::discord::DiscordPresenceState;
 use tauri::Manager;
 
 #[tauri::command]
@@ -25,6 +26,7 @@ pub fn run() {
             // Initialize PTY manager state
             app.manage(PtyManager::new());
             app.manage(NotificationState::new());
+            app.manage(DiscordPresenceState::new());
 
             // Start notification TCP server
             modules::notification::start_notification_server(&app.handle());
@@ -138,6 +140,11 @@ pub fn run() {
             // Clipboard
             modules::clipboard::clipboard_has_image,
             modules::clipboard::clipboard_read_text,
+            // Discord Presence
+            modules::discord::discord_presence_connect,
+            modules::discord::discord_presence_disconnect,
+            modules::discord::discord_presence_update,
+            modules::discord::discord_presence_is_connected,
         ])
         .on_window_event(|window, event| {
             match event {

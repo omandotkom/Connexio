@@ -8,6 +8,7 @@ import UpdateNotification from "./components/UpdateNotification";
 import WelcomeScreen from "./components/WelcomeScreen";
 import Workspace from "./components/Workspace";
 
+import { useDiscordPresence } from "./hooks/useDiscordPresence";
 import { useNotificationStore } from "./stores/notificationStore";
 import { useProjectStore } from "./stores/projectStore";
 import { useSettingsStore } from "./stores/settingsStore";
@@ -16,13 +17,16 @@ import { useThemeStore } from "./stores/themeStore";
 export default function App() {
 	const { loadProjects, activeProjectId, restoreWorkspace } = useProjectStore();
 	const { loadTheme, loadThemes } = useThemeStore();
-	const { isSettingsOpen, loadSettings, loadShells } = useSettingsStore();
+	const { isSettingsOpen, loadSettings, loadShells, discordPresence } = useSettingsStore();
 	const {
 		loadNotifications,
 		loadSettings: loadNotifSettings,
 		handleIncoming,
 		navigateToNotification,
 	} = useNotificationStore();
+
+	// Discord Rich Presence
+	useDiscordPresence(discordPresence);
 
 	useEffect(() => {
 		let mounted = true;

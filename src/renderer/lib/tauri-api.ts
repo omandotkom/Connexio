@@ -384,6 +384,16 @@ export const notification = {
 	getSoundPath: (): Promise<string | null> => invoke("notification_get_sound_path"),
 };
 
+// ─── Discord Presence ────────────────────────────────────────────────────────
+
+export const discord = {
+	connect: (): Promise<boolean> => invoke("discord_presence_connect"),
+	disconnect: (): Promise<boolean> => invoke("discord_presence_disconnect"),
+	update: (details: string, status?: string): Promise<boolean> =>
+		invoke("discord_presence_update", { details, status: status || null }),
+	isConnected: (): Promise<boolean> => invoke("discord_presence_is_connected"),
+};
+
 // ─── Combined API (drop-in replacement for window.connexio) ──────────────────
 
 export const connexioApi = {
@@ -400,6 +410,7 @@ export const connexioApi = {
 	app,
 	updater,
 	notification,
+	discord,
 };
 
 export default connexioApi;

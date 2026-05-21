@@ -255,6 +255,9 @@ function GeneralSettings({
 					onChange={(v) => onChange("webglRenderer", v)}
 				/>
 			</div>
+
+			{/* Discord Presence */}
+			<DiscordPresenceToggle />
 		</div>
 	);
 }
@@ -848,6 +851,27 @@ function useNotificationSettingsState() {
 	};
 
 	return { settings, loadSettings: () => {}, updateSettings };
+}
+
+// === Discord Presence Toggle ===
+function DiscordPresenceToggle() {
+	const { discordPresence, setDiscordPresence } = useSettingsStore();
+	return (
+		<div className="flex items-center justify-between">
+			<div>
+				<label className="block text-xs font-medium text-connexio-text-secondary">
+					Discord Presence
+				</label>
+				<p className="text-[10px] text-connexio-text-muted mt-0.5">
+					Show Connexio activity on your Discord profile
+				</p>
+			</div>
+			<ToggleSwitch
+				checked={discordPresence}
+				onChange={(v) => setDiscordPresence(v)}
+			/>
+		</div>
+	);
 }
 
 // === Toggle Switch ===

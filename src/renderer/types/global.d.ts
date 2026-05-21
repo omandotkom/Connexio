@@ -186,6 +186,12 @@ interface ConnexioAPI {
 		) => () => void;
 		onError: (cb: (error: string) => void) => () => void;
 	};
+	discord: {
+		connect: () => Promise<boolean>;
+		disconnect: () => Promise<boolean>;
+		update: (details: string, status?: string) => Promise<boolean>;
+		isConnected: () => Promise<boolean>;
+	};
 	app: {
 		minimize: () => Promise<void>;
 		maximize: () => Promise<void>;
