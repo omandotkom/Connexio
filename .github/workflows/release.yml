@@ -16,6 +16,8 @@ jobs:
   prepare:
     name: Prepare Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       is_prerelease: ${{ steps.check.outputs.is_prerelease }}
       version: ${{ steps.check.outputs.version }}
